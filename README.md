@@ -19,6 +19,10 @@ If you prefer to install it manually, download the latest *Doorways.zip* release
 Once Doorways is installed, enable the mod in the "Invisible Serapeum" menu and make sure it is the very first mod in the list.
 Finally, restart the game and you're good to go!
 
+## Bug Reports and Feature Suggestions
+
+If you think you've found an issue with Doorways or you have an idea for a feature you'd like to see, please [create a new issue](https://github.com/Montessquio/Doorways/issues/new/choose).
+
 ## Contributing
 
 Contributions to the Doorways Framework are welcome!
