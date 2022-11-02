@@ -23,6 +23,7 @@ using UnityEngine;
 using Patches = sh.monty.doorways.Patches;
 using sh.monty.doorways.Patches.SecretHistories;
 using System.Diagnostics;
+using System.Resources;
 
 public static class DoorwaysFramework
 {
@@ -65,15 +66,18 @@ public static class DoorwaysFramework
                 log.Debug($"{e}");
             }
 
-            try
+            if (File.Exists(Path.Combine(ResourceLoader.AssemblyDirectory, "ENABLE_EXPLORER")))
             {
-                log.Info("Instantiating UnityExplorer");
-                UnityExplorer.ExplorerStandalone.CreateInstance(Logger.LogUnityExplorer);
-            }
-            catch(Exception e)
-            {
-                log.Error("Detected conflict between Harmony and UnityExplorer. UnityExplorer will not be fully loaded.");
-                log.Debug($"{e}");
+                try
+                {
+                    log.Info("Instantiating UnityExplorer");
+                    UnityExplorer.ExplorerStandalone.CreateInstance(Logger.LogUnityExplorer);
+                }
+                catch (Exception e)
+                {
+                    log.Error("Detected conflict between Harmony and UnityExplorer. UnityExplorer will not be fully loaded.");
+                    log.Debug($"{e}");
+                }
             }
 
             log.Info("Performing miscellaneous patches");
