@@ -376,21 +376,14 @@
     <Compile Include="doorways.cs" />
     <Compile Include="DoorwaysOptions.cs" />
     <Compile Include="Patches\ModLoader.cs" />
-    <Compile Include="Patches\RootSpheres.cs" />
     <Compile Include="Patches\RoostCompat.cs" />
     <Compile Include="Patches\SecretHistories\DecayInterceptPatches.cs" />
     <Compile Include="Patches\SecretHistories\CoreEvents.cs" />
     <Compile Include="Patches\SecretHistories\LogPatcher.cs" />
     <Compile Include="UIExtensions\GameOptions.cs" />
-    <Compile Include="UnityObject.cs" />
-    <Compile Include="MonoBehaviours\ExtraTables.cs" />
     <Compile Include="Logger.cs" />
-    <Compile Include="ModLoader.cs" />
-    <Compile Include="MonoBehaviours\DebugTextManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ResourceLoader.cs" />
-    <Compile Include="MonoBehaviours\UnityDebugWindow.cs" />
-    <Compile Include="TableManager.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
