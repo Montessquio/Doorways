@@ -1,0 +1,33 @@
+﻿{
+	"settings": [
+		{
+			"id": "ExampleSetting",
+			"tabid": "UI_DOORWAYS_SETTINGS",
+			"hint": "UI_DOORWAYS_GRAILMOTH",
+			"datatype": "Int32",
+			"minvalue": 0,
+			"maxvalue": 1,
+			"defaultValue": 0,
+			"valuelabels": {
+				"0": "UI_DOORWAYS_MOTH",
+				"1": "UI_DOORWAYS_GRAIL"
+			}
+		},
+		{
+			"id": "doorways.consoleverbosity",
+			"tabid": "UI_DOORWAYS_SETTINGS",
+			"hint": "UI_DOORWAYS_VERBOSITY",
+			"datatype": "Int32",
+			"minvalue": -2,
+			"maxvalue": 2,
+			"defaultValue": 0,
+			"valuelabels": {
+				"2": "UI_DOORWAYS_VERBOSITY_ERRORS",
+				"1": "UI_DOORWAYS_VERBOSITY_WARNINGS",
+				"0": "UI_DOORWAYS_VERBOSITY_INFO",
+				"-1": "UI_DOORWAYS_VERBOSITY_DEBUG",
+				"-2": "UI_DOORWAYS_VERBOSITY_TRACE"
+			}
+		}
+	]
+}

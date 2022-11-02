@@ -1,0 +1,20 @@
+﻿{
+	"cultures": [
+		{
+			"id": "en",
+			"$mute": true,
+			"uilabels$add": {
+				"UI_DOORWAYS_SETTINGS": "DOORWAYS",
+				"UI_DOORWAYS_GRAILMOTH": "Alignment",
+				"UI_DOORWAYS_MOTH": "Moth",
+				"UI_DOORWAYS_GRAIL": "Grail",
+				"UI_DOORWAYS_VERBOSITY": "Console Verbosity",
+				"UI_DOORWAYS_VERBOSITY_ERRORS": "Errors",
+				"UI_DOORWAYS_VERBOSITY_WARNINGS": "Warnings",
+				"UI_DOORWAYS_VERBOSITY_INFO": "Info",
+				"UI_DOORWAYS_VERBOSITY_DEBUG": "Debug",
+				"UI_DOORWAYS_VERBOSITY_TRACE": "Trace"
+			}
+		},
+	]
+}
