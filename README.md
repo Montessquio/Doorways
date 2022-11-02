@@ -18,3 +18,12 @@ If you prefer to install it manually, download the latest *Doorways.zip* release
 
 Once Doorways is installed, enable the mod in the "Invisible Serapeum" menu and make sure it is the very first mod in the list.
 Finally, restart the game and you're good to go!
+
+## Contributing
+
+Contributions to the Doorways Framework are welcome!
+If you're unsure where to start, the [Help Wanted](https://github.com/Montessquio/Doorways/labels/help%20wanted)
+tag is a good place to start. Once you're ready to submit your contribution, please submit a pull request with a verbose
+description of your changes.
+
+If you have questions regarding development, contact @Montessquio#9905 in the `#modding` channel of the [Cultist Simulator Discord Server](https://discord.gg/KxyFTZkUbQ).
