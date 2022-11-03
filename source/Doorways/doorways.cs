@@ -89,4 +89,30 @@ public static class DoorwaysFramework
             throw e;
         }
     }
+
+
+    /// <summary>
+    /// Signals to Doorways that this class can be loaded
+    /// as a Fucine Importable. It must be a child class of
+    /// an existing Fucine class or a Doorways entity class.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public class DoorwaysObjectAttribute : Attribute { }
+
+    /// <summary>
+    /// A shorthand signal to Doorways that this enum
+    /// can be used as a Fucine DeckSpec.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Enum)]
+    public class DeckAttribute : Attribute { }
+
+    /// <summary>
+    /// Contains APIs for other mods to register their own
+    /// mod content into the game.
+    /// </summary>
+    public class Doorways
+    {
+        
+    }
+
 }

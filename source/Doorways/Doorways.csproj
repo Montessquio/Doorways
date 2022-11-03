@@ -373,6 +373,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Derive.cs" />
     <Compile Include="doorways.cs" />
     <Compile Include="DoorwaysOptions.cs" />
     <Compile Include="Patches\ModLoader.cs" />
