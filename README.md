@@ -31,3 +31,9 @@ tag is a good place to start. Once you're ready to submit your contribution, ple
 description of your changes.
 
 If you have questions regarding development, contact @Montessquio#9905 in the `#modding` channel of the [Cultist Simulator Discord Server](https://discord.gg/KxyFTZkUbQ).
+
+### Branch Layout
+
+- `master` - The only commits on this branch should be merges from `devel` for versioned releases. The HEAD of `master` should be the same as the current published mod version.
+- `devel` - Primary development branch. Should generally be stable, but may not be. All feature branches are to be aggregated onto `devel` before they are checked and merged into `main` for a release.
+- `feature/*` - Individual feature branches. These are merged into `devel` once they're complete, and may or may not be deleted once finished.
