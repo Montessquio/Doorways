@@ -19,8 +19,8 @@ namespace sh.monty.doorways.UIExtensions
     /// </summary>
     public static class GameSplash
     {
-        public static string Quote;
-        public static string Advice;
+        public static string Quote = null;
+        public static string Advice = null;
 
         public static void Initialize()
         {
