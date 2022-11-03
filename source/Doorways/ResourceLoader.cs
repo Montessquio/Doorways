@@ -1,5 +1,4 @@
-﻿using sh.monty.doorways.Unity;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
@@ -70,11 +69,6 @@ namespace sh.monty.doorways
             var tex = new Texture2D(1, 1);
             tex.LoadImage(bytes);
             return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(tex.width / 2, tex.height / 2));
-        }
-
-        internal static Prefab LoadPrefab(string path)
-        {
-            throw new NotImplementedException();
         }
     }
 }
