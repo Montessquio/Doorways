@@ -10,6 +10,8 @@ using Patches = sh.monty.doorways.Patches;
 using sh.monty.doorways.Patches.SecretHistories;
 using System.Diagnostics;
 using sh.monty.doorways.UIExtensions;
+using sh.monty.doorways.CoreExtensions;
+using sh.monty.doorways.CoreExtensions.Tables;
 
 public static class DoorwaysFramework
 {
@@ -47,6 +49,8 @@ public static class DoorwaysFramework
                 log.Info("Initializing Doorways Engine Extensions");
                 GameSplash.Initialize();
                 log.Debug("Initialized Splash Screen Module");
+                TablesManager.Initialize();
+                log.Debug("Initialized Tables Module");
             }
             catch (Exception e)
             {
@@ -73,7 +77,7 @@ public static class DoorwaysFramework
                 }
                 catch (Exception e)
                 {
-                    log.Error("Detected conflict between Harmony and UnityExplorer. UnityExplorer will not be fully loaded.");
+                    log.Error("Detected a problem with UnityExplorer. UnityExplorer will not be fully loaded.");
                     log.Debug($"{e}");
                 }
             }

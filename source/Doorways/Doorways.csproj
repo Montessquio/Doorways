@@ -391,6 +391,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CoreExtensions\Tables\AuxPermanentRootSphereSpec.cs" />
+    <Compile Include="CoreExtensions\Tables\AuxTabletopSphere.cs" />
+    <Compile Include="CoreExtensions\Tables\Table.cs" />
+    <Compile Include="CoreExtensions\Tables\TablesManager.cs" />
     <Compile Include="doorways.cs" />
     <Compile Include="DoorwaysOptions.cs" />
     <Compile Include="Patches\ModLoader.cs" />
@@ -411,8 +415,6 @@
   <ItemGroup>
     <Content Include="Patches\README.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="CoreExtensions\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
