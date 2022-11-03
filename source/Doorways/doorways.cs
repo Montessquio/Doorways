@@ -1,29 +1,15 @@
 ﻿using HarmonyLib;
 using Logger = sh.monty.doorways.logging.Logger;
-using Newtonsoft.Json;
-using SecretHistories.Assets.Scripts.Application.Entities;
 using SecretHistories.Constants.Modding;
-using SecretHistories.UI;
-using SecretHistories;
 using sh.monty.doorways.logging;
 using sh.monty.doorways;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Windows.Documents;
-using System.Windows.Forms;
 using System;
-using UnityEngine.InputSystem.Controls;
-using UnityEngine.InputSystem;
-using UnityEngine.UIElements;
-using UnityEngine.Windows;
-using UnityEngine;
 using Patches = sh.monty.doorways.Patches;
 using sh.monty.doorways.Patches.SecretHistories;
 using System.Diagnostics;
-using System.Resources;
+using sh.monty.doorways.UIExtensions;
 
 public static class DoorwaysFramework
 {
@@ -55,6 +41,18 @@ public static class DoorwaysFramework
 
             log.Info("Initializing Mod Preferences");
             DoorwaysOptions.Initialize();
+
+            try
+            {
+                log.Info("Initializing Doorways Engine Extensions");
+                GameSplash.Initialize();
+                log.Debug("Initialized Splash Screen Module");
+            }
+            catch (Exception e)
+            {
+                log.Error("An Exception occurred while initializing Doorways Mods. The mod itself will work, but no Doorways Mods will be enabled.");
+                log.Debug($"{e}");
+            }
 
             try
             {
