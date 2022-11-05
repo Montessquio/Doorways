@@ -391,7 +391,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Derive.cs" />
     <Compile Include="doorways.cs" />
     <Compile Include="DoorwaysOptions.cs" />
     <Compile Include="Patches\ModLoader.cs" />
@@ -399,6 +398,7 @@
     <Compile Include="Patches\SecretHistories\DecayInterceptPatches.cs" />
     <Compile Include="Patches\SecretHistories\CoreEvents.cs" />
     <Compile Include="Patches\SecretHistories\LogPatcher.cs" />
+    <Compile Include="Patches\TypeExtensions.cs" />
     <Compile Include="UIExtensions\GameOptions.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

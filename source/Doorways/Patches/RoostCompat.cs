@@ -1,12 +1,15 @@
 ﻿using HarmonyLib;
 using SecretHistories.Constants.Modding;
 using SecretHistories.Entities;
+using SecretHistories.Fucine;
+using SecretHistories.Fucine.DataImport;
 using sh.monty.doorways.logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -35,16 +38,39 @@ namespace sh.monty.doorways.Patches
                         _span.Info("Patching The Roost Machine...");
                         try
                         {
-                            Type type = assembly.GetType("TheRoostMachine");
-                            MethodInfo target = type.GetMethod("Initialise");
+                            {
+                                _span.Debug("  Patching Initialise...");
+                                Type type = assembly.GetType("TheRoostMachine");
+                                MethodInfo target = type.GetMethod("Initialise");
 
-                            var prefix = typeof(DoorwaysInjections).GetMethod(nameof(DoorwaysInjections.InitialisePrefix));
-                            var postfix = typeof(DoorwaysInjections).GetMethod(nameof(DoorwaysInjections.InitialisePostfix));
-                            patcher.Patch(
-                                target,
-                                prefix: new HarmonyMethod(prefix),
-                                postfix: new HarmonyMethod(postfix)
-                            );
+                                var prefix = typeof(DoorwaysInjections).GetMethod(nameof(DoorwaysInjections.InitialisePrefix));
+                                var postfix = typeof(DoorwaysInjections).GetMethod(nameof(DoorwaysInjections.InitialisePostfix));
+                                patcher.Patch(
+                                    target,
+                                    prefix: new HarmonyMethod(prefix),
+                                    postfix: new HarmonyMethod(postfix)
+                                );
+                            }
+                            {
+                                _span.Debug("  Patching InvokeGenericImporterForAbstractRootEntity...");
+                                Type type = assembly.GetType("Roost.Beachcomber.Usurper");
+                                MethodInfo target = AccessTools.Method(
+                                    type,
+                                    "InvokeGenericImporterForAbstractRootEntity",
+                                    new Type[] { typeof(IEntityWithId), typeof(EntityData), typeof(ContentImportLog) }
+                                );
+
+                                var transpiler = typeof(InvokeGenericImporterForAbstractRootEntityPatcher)
+                                .GetMethod(
+                                    nameof(InvokeGenericImporterForAbstractRootEntityPatcher.Transpile),
+                                    new Type[] { typeof(IEnumerable<CodeInstruction>) }
+                                );
+
+                                patcher.Patch(
+                                    target,
+                                    transpiler: new HarmonyMethod(transpiler)
+                                );
+                            }
                         }
                         catch (Exception e)
                         {
@@ -93,6 +119,33 @@ namespace sh.monty.doorways.Patches
                         .Find("SettingsPanel")
                         .Find("SliderSetting_verbosity");
                     option.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private class InvokeGenericImporterForAbstractRootEntityPatcher
+        {
+            public static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions)
+            {
+                var _span = Logger.Span();
+                bool found = false;
+                foreach (var instruction in instructions)
+                {
+                    if (!found && instruction.opcode == OpCodes.Callvirt)
+                    {
+                        found = true;
+                        // Replace the callvirt to entity.GetType() with a callvirt to entity.GetUnderlyingElement()
+                        MethodInfo fn = AccessTools.Method(
+                            typeof(TypeExtensions), 
+                            "GetUnderlyingElement", 
+                            new Type[] { typeof(IEntityWithId)  
+                        });
+                        yield return new CodeInstruction(OpCodes.Call, fn);
+                    }
+                    else
+                    {
+                        yield return instruction;
+                    }
                 }
             }
         }
