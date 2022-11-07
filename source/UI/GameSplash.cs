@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
-using Logger = sh.monty.doorways.logging.Logger;
 
 namespace sh.monty.doorways.UIExtensions
 {

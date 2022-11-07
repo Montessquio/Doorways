@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using SecretHistories.Constants.Modding;
-using sh.monty.doorways.logging;
 using System;
 using System.Collections.Generic;
 using System.IO;

@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using HarmonyLib;
-using sh.monty.doorways.logging;
-using Logger = sh.monty.doorways.logging.Logger;
 using Core = SecretHistories;
 using SecretHistories.Fucine;
 using SecretHistories.Entities;
