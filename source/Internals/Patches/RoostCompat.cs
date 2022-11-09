@@ -1,20 +1,11 @@
 ﻿using HarmonyLib;
-using SecretHistories.Constants.Modding;
-using SecretHistories.Entities;
 using SecretHistories.Fucine;
 using SecretHistories.Fucine.DataImport;
-using sh.monty.doorways.logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using UnityEngine;
-using Logger = sh.monty.doorways.logging.Logger;
 
 namespace sh.monty.doorways.Patches
 {

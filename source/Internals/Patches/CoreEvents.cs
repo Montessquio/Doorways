@@ -9,7 +9,6 @@ using SecretHistories.Core;
 using SecretHistories.Entities;
 using SecretHistories.Infrastructure;
 using SecretHistories.UI;
-using sh.monty.doorways.logging;
 using UnityEngine.UIElements;
 
 namespace sh.monty.doorways.Patches.SecretHistories

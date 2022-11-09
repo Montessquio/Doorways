@@ -9,7 +9,6 @@ using HarmonyLib;
 using SecretHistories.Entities;
 using SecretHistories.Enums;
 using SecretHistories.UI;
-using sh.monty.doorways.logging;
 
 namespace sh.monty.doorways.Patches.SecretHistories
 {
