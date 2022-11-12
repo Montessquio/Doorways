@@ -230,6 +230,10 @@ namespace Doorways.Internals.Patches
                 }
             }
 
+            // Set the ID to lowercase, since the game expects all IDs to be
+            // lowercase-converted.
+            entity.SetId(entity.Id.ToLower());
+
             // Add the type of the underlying store if it doesnt yet exist
             Dictionary<Type, EntityStore> ecs = entityStores.GetValue(compendium) as Dictionary<Type, EntityStore>;
             if (!ecs.ContainsKey(underlyingType))
@@ -268,14 +272,14 @@ namespace Doorways.Internals.Patches
             try
             {
                 object obj = Activator.CreateInstance(t);
-                obj.GetActualType()
+                /*obj.GetActualType()
                 .InvokeMember(
                     "SetDefaultValues",
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod,
                     null,
                     obj,
                     new object[] { }
-                );
+                );*/
                 _span.Debug("  Instantiated entity");
                 IEntityWithId o = obj as IEntityWithId;
                 compendium.InitialiseForEntityTypes(new Type[] { t });
