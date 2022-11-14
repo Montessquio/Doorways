@@ -393,7 +393,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="doorways.cs" />
-    <Compile Include="Entities\DoorwaysAttributes.cs" />
+    <Compile Include="DoorwaysAttributes.cs" />
+    <Compile Include="DoorwaysMod.cs" />
+    <Compile Include="Entities\Card.cs" />
+    <Compile Include="Entities\Mixins\IForcedSuperclassMixin.cs" />
+    <Compile Include="Entities\INamespacedIDEntity.cs" />
+    <Compile Include="Entities\RecipeLink.cs" />
+    <Compile Include="Entities\Slot.cs" />
+    <Compile Include="Entities\XTrigger.cs" />
     <Compile Include="Internals\Patches\DynamicObjects.cs" />
     <Compile Include="Internals\Patches\ModLoader.cs" />
     <Compile Include="Internals\Patches\RoostCompat.cs" />

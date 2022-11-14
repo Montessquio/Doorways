@@ -1,13 +1,16 @@
-﻿using Doorways.Entities;
-using HarmonyLib;
+﻿using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using SecretHistories.Fucine;
+using SecretHistories.Services;
 using SecretHistories.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using TMPro;
+using UIWidgets.Extensions;
 using UniverseLib;
+using static UnityEngine.EventSystems.EventTrigger;
 using OpCodes = System.Reflection.Emit.OpCodes;
 
 namespace Doorways.Internals.Patches
@@ -17,25 +20,43 @@ namespace Doorways.Internals.Patches
     /// mod loader mechanism.
     /// </summary>
     [HarmonyPatch]
-    class ModLoader
+    internal class ModLoader
     {
+        /// <summary>
+        /// Filled by <see cref="DoorwaysMod"/> constructors. 
+        /// Doorways' indirect attribute loading mechanism
+        /// (see <see cref="LoadDoorwaysMod(Assembly, string)"/>) 
+        /// creates <see cref="DoorwaysMod"/> instances which
+        /// implicitly adds tagged mod content into this dictionary.
+        /// <para/>
+        /// Used by <see cref="PostLoadCompendium"/> to add
+        /// mod content to the core engine.
+        /// </summary>
+        internal static Dictionary<string, DoorwaysMod> Mods = new Dictionary<string, DoorwaysMod>();
+
+        /// <summary>
+        /// Runs once for each enabled mod.
+        /// <para/>
+        /// Checks the mod synopsis to see if it's a Doorways
+        /// mod; if it is, it reads all doorways data out of it
+        /// and into the mods registry (<see cref="Mods"/>)
+        /// </summary>
         [HarmonyPostfix]
         [HarmonyPatch(typeof(DataFileLoader), nameof(DataFileLoader.LoadFilesFromAssignedFolder))]
-        private static void DataLoadHook(DataFileLoader __instance)
+        private static void PostLoadMod(DataFileLoader __instance)
         {
             var _span = Logger.Span();
 
             var mod_root = Directory.GetParent(__instance.ContentFolder).FullName;
             var mod_id = new DirectoryInfo(mod_root).Name;
 
-            var synopsis = parseDoorwaysMod(mod_root);
+            var synopsis = ParseDoorwaysMod(mod_root);
 
             if (synopsis != null)
             {
                 JObject dmeta = synopsis["doorways"] as JObject;
                 if (dmeta.ContainsKey("dll"))
                 {
-                    _span.Info($"Detected Doorways Mod {mod_id}");
                     string dll_path;
                     try
                     {
@@ -43,7 +64,7 @@ namespace Doorways.Internals.Patches
                     }
                     catch (Exception)
                     {
-                        _span.Error($"Mod {mod_id} had an invalid manifest key: The key 'dll' must be a string.");
+                        _span.Error($"Could not load mod '{mod_id}'. Reason: Invalid manifest key: The key 'dll' must be a string.");
                         return;
                     }
 
@@ -53,17 +74,34 @@ namespace Doorways.Internals.Patches
                         {
                             Assembly mod = Assembly.LoadFrom(dll_path);
                             _span.Info($"Loading Doorways Plug-in Mod: '{mod.FullName}'");
-                            loadDoorwaysMod(mod, mod_id);
+                            LoadDoorwaysMod(mod, mod_id);
                         }
                         catch (Exception e)
                         {
-                            _span.Error($"Encountered an error loading Doorways DLL for {mod_id}: {e}");
+                            _span.Error($"Could not load mod '{mod_id}'. Reason: {e}.");
                         }
                         return;
                     }
-                    _span.Error($"Mod {mod_id} specified a DLL path that did not exist: {dll_path}");
+                    _span.Error($"Could not load mod '{mod_id}'. Reason: Specified a DLL path that did not exist, \"{dll_path}\"");
                 }
             }
+        }
+
+        private static bool PostLoadCompendium_HasRun = false;
+        /// <summary>
+        /// Runs once after all mods have been loaded and after
+        /// the compendium has been initialized.
+        /// </summary>
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(CompendiumLoader), nameof(CompendiumLoader.PopulateCompendium))]
+        private static ContentImportLog PostLoadCompendium(ContentImportLog __result)
+        {
+            if(PostLoadCompendium_HasRun) { return __result; }
+            PostLoadCompendium_HasRun = true;
+
+            Compendium compendium = Watchman.Get<Compendium>();
+            Mods.Values.ForEach((mod) => RegisterDoorwaysMod(mod, ref compendium, ref __result));
+            return __result;
         }
 
         /// <summary>
@@ -71,7 +109,7 @@ namespace Doorways.Internals.Patches
         /// If it has a "doorways" top-level key that has a dictionary value,
         /// it returns the whole parsed JSON file. Otherwise, returns null.
         /// </summary>
-        private static JObject parseDoorwaysMod(string mod_root)
+        private static JObject ParseDoorwaysMod(string mod_root)
         {
             var _span = Logger.Span();
 
@@ -98,210 +136,183 @@ namespace Doorways.Internals.Patches
             return null;
         }
 
-        private static Compendium compendium = null;
-        private static FieldInfo entityStores = AccessTools.Field(typeof(Compendium), "entityStores");
-
         /// <summary>
-        /// Loads a Doorways assembly's mod content into the Compendium.
+        /// Registers a Doorways mod assembly into <see cref="Mods"/>
+        /// <para/>
+        /// In order to present your DLL as a Doorways mod, add
+        /// the [Doorways] attribute to its assembly properties.
+        /// <para/>
+        /// Doorways will automatically register any types that
+        /// derive from <see cref="AbstractEntity{T}"/> and
+        /// have the [<see cref="DoorwaysObjectAttribute"/>]
+        /// attribute. It will automatically construct any
+        /// types that inherit from <see cref="DoorwaysFactory"/>
+        /// and have the [<see cref="DoorwaysObjectAttribute"/>]
+        /// and register the Entities they produce.
         /// </summary>
-        private static void loadDoorwaysMod(Assembly mod, string mod_id)
+        private static void LoadDoorwaysMod(Assembly mod, string mod_id)
         {
-            // Cache the compendium only once
-            if (compendium == null)
-            {
-                compendium = Watchman.Get<Compendium>();
-            }
             var _span = Logger.Span();
 
-            // If the entity store isn't set up yet, then set it up.
-            if (entityStores.GetValue(compendium) == null)
-            {
-                entityStores.SetValue(compendium, new Dictionary<Type, EntityStore>());
-            }
+            var doorwaysModAttr = mod.GetCustomAttribute<DoorwaysAttribute>();
 
-            var customNamespace = mod.GetCustomAttribute<DoorwaysNamespaceAttribute>();
-            string base_id = mod_id;
-            if (customNamespace != null)
-            {
-                base_id = customNamespace.Id;
-            }
-            _span.Info($"Determined mod baseid to be '{base_id}' (Attribute was {(customNamespace == null ? "not present" : "present")}");
+            string ModName = doorwaysModAttr.Name ?? mod.FullName;
+            string ModPrefix = doorwaysModAttr.Prefix ?? mod_id;
 
-            // get all [DoorwaysObject]s in the assembly
+            // Instantiating this class automatically adds the instance
+            // to the doorways mod registry.
+            DoorwaysMod thisMod = new DoorwaysMod(ModName, ModPrefix);
+            _span.Info($"Detected Doorways Mod {thisMod.ModName} with baseid {thisMod.ModId}");
+
+            // Get all [DoorwaysObject]s in the assembly
             IEnumerable<Type> types = mod.GetTypes();
             foreach (Type t in types)
             {
                 if (t.IsClass)
                 {
+                    // Determine if this is a valid entity we can register.
                     _span.Debug($"Inspecting type '{t.Name}'");
                     bool hasDoorwaysAttr = t.GetCustomAttribute<DoorwaysObjectAttribute>() != null;
-                    _span.Debug($"  Checking for Doorways attribute... {hasDoorwaysAttr}");
-
-                    bool isRegisterable = typeof(IEntityWithId).IsAssignableFrom(t);
-                    _span.Debug($"  Checking for registrant status... {isRegisterable}");
-
-                    bool isFactory = typeof(DoorwaysFactory).IsAssignableFrom(t);
-                    _span.Debug($"  Checking for factory status... {isFactory}");
-
-                    if (hasDoorwaysAttr && isRegisterable)
+                    if(hasDoorwaysAttr)
                     {
-                        TryRegisterStaticEntity(t, base_id, mod_id);
-                    }
-                    else if (hasDoorwaysAttr && isFactory)
-                    {
-                        DoorwaysFactory factory = Activator.CreateInstance(t) as DoorwaysFactory;
-                        foreach (IEntityWithId entity in factory.GetAll())
+                        bool isRegisterable = typeof(IEntityWithId).IsAssignableFrom(t);
+                        bool isFactory = typeof(DoorwaysFactory).IsAssignableFrom(t);
+                        _span.Debug($"  {t.Name}: (Registerable: {(isRegisterable ? "true" : "false")}, Factory: {(isFactory ? "true" : "false")})");
+
+                        if (isRegisterable)
                         {
-                            Type underlyingType = entity.GetUnderlyingElement();
-                            TryRegisterInstancedEntity(entity, t, underlyingType, base_id, mod_id, true);
+                            thisMod.RegisterEntity(InstantiateStaticEntity(t));
+                        }
+                        else if (isFactory)
+                        {
+                            DoorwaysFactory factory = Activator.CreateInstance(t) as DoorwaysFactory;
+                            factory.GetAll().ForEach((entity) => thisMod.RegisterEntity(entity));
+                        }
+                        else
+                        {
+                            _span.Error($"Marked entity '{t.FullName}' does not derive from IEntityWithId or DoorwaysFactory and/or is not marked with the [DoorwaysObject] attribute, so it cannot be registered as game data.");
                         }
                     }
-                    else
-                    {
-                        _span.Error($"Marked entity '{t.FullName}' does not derive from IEntityWithId or DoorwaysFactory and/or is not marked with the [DoorwaysObject] attribute, so it cannot be registered as game data.");
-                    }
                 }
             }
         }
 
         /// <summary>
-        /// If our derived classes shadow variables in the base class, then those
-        /// shadowed values will not persist when core casts them into the base
-        /// element class. This sets all overridden (with "new") properties (but 
-        /// not fields) from the superclass into the underlying type ancestor.
+        /// Registers all the content in a given doorways mod
+        /// into the core game engine.
+        /// <para />
+        /// This method should <b>never</b> throw an exception,
+        /// and instead simply emit an error in the log
+        /// with exception information.
         /// </summary>
-        private static void ApplySuperClassToBaseClass(ref IEntityWithId obj, Type superType, Type underlyingType)
+        private static void RegisterDoorwaysMod(DoorwaysMod mod, ref Compendium compendium, ref ContentImportLog log)
         {
             var _span = Logger.Span();
-            Type masterType = obj.GetActualType();
-            foreach (PropertyInfo property in masterType.GetProperties(/*BindingFlags.DeclaredOnly | */BindingFlags.Instance | BindingFlags.Public))
+            try
             {
-                PropertyInfo underlyingProperty = underlyingType.GetProperty(property.Name, BindingFlags.Default | BindingFlags.Instance | BindingFlags.Public);
-                if (property.IsDeclaredMember())
+                foreach (IEntityWithId entity in mod.registry.Values)
                 {
-                    if (property.CanRead && underlyingProperty != null && underlyingProperty.CanWrite)
-                    {
-                        underlyingProperty.SetValue(obj, property.GetValue(obj));
-                    }
+                    TryRegisterInstancedEntity(entity, mod.ModName, ref compendium, ref log);
                 }
+            }
+            catch(Exception e)
+            {
+                // Misbehaving mods don't get to be in the mod registry.
+                Mods.Remove(mod.ModId);
+                _span.Error($"Could not register content for Doorways mod '{mod.ModName}': {e}");
             }
         }
 
         /// <summary>
-        /// Registeres a new entity (card, verb, etc)
-        /// created at runtime.
+        /// Instantiates a type into a concrete
+        /// <see cref="IEntityWithId"/> that
+        /// can be then registered in the game's
+        /// compendium.
         /// </summary>
-        public static void TryRegisterInstancedEntity(IEntityWithId entity, Type superType, Type underlyingType, string base_id, string mod_id = "@anonymous", bool is_factory = false)
+        private static IEntityWithId InstantiateStaticEntity(Type t)
         {
             var _span = Logger.Span();
-
-            // If we're dealing with a Factory, then we need
-            // to change Id generation semantics to support
-            // dynamically generated entities.
-            if(is_factory)
-            {
-                // preserge original behavior
-                if(entity.Id == null || entity.Id == "id")
-                {
-                    _span.Error($"Entities produced by a Factory must have IDs! Caused by: {mod_id}");
-                    throw new InvalidDataException("Entities produced by a Factory must have IDs!");
-                }
-                else if(entity.Id.StartsWith("."))
-                {
-                    // A . preceding the entity id means that it should
-                    // be interpreted as a literal, so remove the dot and proceed.
-                    entity.SetId(entity.Id.Remove(0, 1));
-                }
-                else
-                {
-                    // If it doesn't start with a dot and it's not
-                    // empty, prepend the base id.
-                    entity.SetId(base_id + "." + entity.Id);
-                }
-            }
-            else
-            {
-                // Non-factory behavior. Simply prepend the id and move on.
-                if (entity.Id == null || entity.Id == "id")
-                {
-                    string id = base_id + "." + entity.GetActualType().Name;
-                    entity.SetId(id);
-                    _span.Warn($"{id}");
-                }
-            }
-
-            // Set the ID to lowercase, since the game expects all IDs to be
-            // lowercase-converted.
-            entity.SetId(entity.Id.ToLower());
-
-            // Add the type of the underlying store if it doesnt yet exist
-            Dictionary<Type, EntityStore> ecs = entityStores.GetValue(compendium) as Dictionary<Type, EntityStore>;
-            if (!ecs.ContainsKey(underlyingType))
-            {
-                ecs.Add(underlyingType, new EntityStore());
-            }
-
-            // Apply the entity's overrides to the underlying type.
-            ApplySuperClassToBaseClass(ref entity, superType, underlyingType);
-
-            // Add the new entity to that store
-            EntityStore entityStore = ecs[underlyingType];
-            if (!entityStore.TryAddEntity(entity))
-            {
-                _span.Error($"Can't add entity {entity.Id} of type {entity.GetType()}\". Does it already Exist?");
-                entity.OnPostImport(new ContentImportLog(), compendium);
-            }
-
-            // Verify the entity was added properly
-            var e = typeof(Compendium)
-                .GetMethod(nameof(compendium.GetEntityById))
-                .MakeGenericMethod(underlyingType)
-                .Invoke(compendium, new object[] { entity.Id });
-            _span.Debug($"Loaded Entity '{entity.GetType().Name}'/'{entity.Id}' for mod '{mod_id}' as '{entity.GetUnderlyingElement().Name}'");
-
-        }
-
-        /// <summary>
-        /// Registers some type that derives from AbstractEntity
-        /// into the compendium.
-        /// </summary>
-        private static void TryRegisterStaticEntity(Type t, string base_id, string mod_id = "@anonymous")
-        {
-            var _span = Logger.Span();
-            _span.Debug("  Status OK.");
             try
             {
                 object obj = Activator.CreateInstance(t);
-                /*obj.GetActualType()
-                .InvokeMember(
-                    "SetDefaultValues",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod,
-                    null,
-                    obj,
-                    new object[] { }
-                );*/
-                _span.Debug("  Instantiated entity");
                 IEntityWithId o = obj as IEntityWithId;
-                compendium.InitialiseForEntityTypes(new Type[] { t });
-                _span.Debug("  Initializing new Type in compendium");
                 Type underlyingType = o.GetUnderlyingElement();
-                string name = underlyingType.Name ?? "null";
-                _span.Debug($"    Underlying Compendium type resolved to '{name}'");
-
                 if (underlyingType != null)
                 {
-                    TryRegisterInstancedEntity(o, t, underlyingType, base_id, mod_id);
+                    _span.Debug($"  Underlying Compendium type resolved to '{underlyingType.Name ?? "null"}'");
+                    return o;
                 }
                 else
                 {
-                    _span.Debug($"Marked entity '{t.FullName}' does not derive from AbstractEntity, so it cannot be registered as game data.");
+                    throw new ArgumentException($"Marked entity '{t.FullName}' does not derive from AbstractEntity, so it cannot be registered as game data.");
                 }
             }
             catch (Exception e)
             {
                 _span.Error($"Exception occurred constructing and registering '{t.FullName}': {e}");
+                throw e;
             }
         }
+
+        #region Compendium Manipulation
+        /// <summary>
+        /// Registeres a new entity (card, verb, etc)
+        /// created at runtime into the core game
+        /// engine's <see cref="Compendium"/>.
+        /// <para/>
+        /// This function does not check its input - 
+        /// it is the responsibility of the caller to 
+        /// ensure input data is correct!
+        /// </summary>
+        private static void TryRegisterInstancedEntity(IEntityWithId entity, string modName, ref Compendium compendium, ref ContentImportLog contentImportLog)
+        {
+            var _span = Logger.Span();
+
+            // Set the ID to lowercase, since the game expects all IDs to be
+            // lowercase-converted.
+            entity.SetId(entity.Id.ToLower());
+
+            // Ensure the compendium is ready to receive our types.
+            // Realistically we only need to do this for one of the three,
+            // but it costs very little to pre-initialize so we'll just
+            // add them all at once.
+            //
+            // Remember that this method is patched - see the transpiler
+            // method below for more details.
+            compendium.InitialiseForEntityTypes(new Type[] { entity.GetType(), entity.GetActualType(), entity.GetUnderlyingElement() });
+
+            // Add the type of the underlying store if it doesnt yet exist
+            FieldInfo entityStores = AccessTools.Field(typeof(Compendium), "entityStores");
+            Dictionary<Type, EntityStore> ecs = entityStores.GetValue(compendium) as Dictionary<Type, EntityStore>;
+            if (!ecs.ContainsKey(entity.GetUnderlyingElement()))
+            {
+                ecs.Add(entity.GetUnderlyingElement(), new EntityStore());
+            }
+
+            // Apply the entity's overrides to the underlying type.
+            //ApplySuperClassToBaseClass(ref entity, entity.GetActualType(), entity.GetUnderlyingElement());
+
+            // Add the new entity to the entity type store
+            EntityStore entityStore = ecs[entity.GetUnderlyingElement()];
+            if (!entityStore.TryAddEntity(entity))
+            {
+                _span.Error($"Can't add entity {entity.Id} of type {entity.GetType()}\". Does it already Exist?");
+            }
+
+            // Initialize the newly added entity.
+            entity.OnPostImport(contentImportLog, compendium);
+
+            // Verify the entity was added properly
+            var e = typeof(Compendium)
+                .GetMethod(nameof(compendium.GetEntityById))
+                .MakeGenericMethod(entity.GetUnderlyingElement())
+                .Invoke(compendium, new object[] { entity.Id });
+        }
+        
+
+        #endregion
+
+        #region Core Compat Patches
 
         /// <summary>
         /// In the transpiler function below, we remove the
@@ -334,6 +345,7 @@ namespace Doorways.Internals.Patches
         private static IEnumerable<CodeInstruction> DontOverwriteEntityStores(IEnumerable<CodeInstruction> instructions)
         {
             var _span = Logger.Span();
+            FieldInfo entityStores = AccessTools.Field(typeof(Compendium), "entityStores");
             foreach (var instruction in instructions)
             {
                 if (instruction.StoresField(entityStores))
@@ -356,20 +368,6 @@ namespace Doorways.Internals.Patches
             }
         }
 
-        /*
-        [HarmonyPostfix]
-        [HarmonyPatch(typeof(CompendiumNullObjectStore), nameof(CompendiumNullObjectStore.GetNullObjectForType))]
-        private static object OverrideForSubTypes(object __result, Type forType, string entityId, CompendiumNullObjectStore __instance)
-        {
-            if(__result == null)
-            {
-                var _span = Logger.Span($"Attempting to get null object for underlying element type '{forType.GetUnderlyingElementType()}'");
-                return __instance.GetNullObjectForType(forType.GetUnderlyingElementType(), entityId);
-            }
-            return __result;
-        }
-        */
-
-
+        #endregion
     }
 }

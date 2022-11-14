@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Doorways.Entities
+namespace Doorways
 {
 
     /// <summary>
@@ -102,12 +102,11 @@ namespace Doorways.Entities
     /// If it's not present, the namespace will be the same as mod's ID.
     /// </summary>
     [AttributeUsage(AttributeTargets.Assembly)]
-    public class DoorwaysNamespaceAttribute : Attribute
+    public class DoorwaysAttribute : Attribute
     {
-        public string Id;
-        public DoorwaysNamespaceAttribute(string id)
-        {
-            Id = id;
-        }
+        public string Name = null;
+        public string Prefix = null;
+
+        public DoorwaysAttribute() { }
     }
 }
