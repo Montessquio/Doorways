@@ -7,6 +7,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using UIWidgets.Extensions;
 using UniverseLib;
@@ -75,7 +76,31 @@ namespace Doorways.Internals.Patches
                 // Load all mod plug-ins
                 foreach (DoorwaysPlugin loadedPlugin in LoadDoorwaysPluginsForMod(Path.Combine(mod_root, "content"), mod_id))
                 {
-                    mod.RegisterPlugin(loadedPlugin);
+                    try
+                    {
+                        // Special: Call the Init methods specified by this mod.
+                        // This *has* to be done here.
+                        IEnumerable<MethodInfo> initMethods = loadedPlugin.PluginAssembly.GetTypes()
+                            .Where(x => x.IsClass)
+                            .SelectMany(x => x.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+                            .Where(x => x.GetCustomAttribute<DoorwaysInitAttribute>() != null);
+                        foreach (MethodInfo init in initMethods)
+                        {
+                            if (init.GetParameters().Count() == 1 && init.GetParameters()[0].ParameterType == typeof(IDoorwaysMod))
+                            {
+                                init.Invoke(null, new object[] { mod.GetInitializerMetadata(loadedPlugin) });
+                            }
+                            else if (init.GetParameters().Count() == 0)
+                            {
+                                init.Invoke(null, new object[] { });
+                            }
+                        }
+                        mod.RegisterPlugin(loadedPlugin);
+                    }
+                    catch(Exception e)
+                    {
+                        _span.Error($"Could not register plugin '{loadedPlugin.Name}' for mod '{mod.ModName}'. Reason: Exception thrown while invoking initializer: {e}");
+                    }
                 }
 
                 // TODO

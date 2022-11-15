@@ -106,11 +106,17 @@ namespace Doorways
             }
             ModLoader.Mods.Add(ModName, this);
         }
+
+        public IDoorwaysMod GetInitializerMetadata(DoorwaysPlugin forPlugin)
+        {
+            // TODO
+            return null;
+        }
     }
 
     public class DoorwaysPlugin
     {
-        private Assembly PluginAssembly { get; set; }
+        internal Assembly PluginAssembly { get; set; }
 
         public string Name
         {

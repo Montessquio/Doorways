@@ -401,6 +401,7 @@
     <Compile Include="Entities\RecipeLink.cs" />
     <Compile Include="Entities\Slot.cs" />
     <Compile Include="Entities\XTrigger.cs" />
+    <Compile Include="IDoorwaysMod.cs" />
     <Compile Include="Internals\Patches\DynamicObjects.cs" />
     <Compile Include="Internals\Patches\ModLoader.cs" />
     <Compile Include="Internals\Patches\RoostCompat.cs" />
