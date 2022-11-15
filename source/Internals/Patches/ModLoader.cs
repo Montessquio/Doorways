@@ -1,16 +1,15 @@
-﻿using HarmonyLib;
+﻿using Assets.Scripts.Application.Entities.NullEntities;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using SecretHistories.Fucine;
-using SecretHistories.Services;
 using SecretHistories.UI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using TMPro;
 using UIWidgets.Extensions;
 using UniverseLib;
-using static UnityEngine.EventSystems.EventTrigger;
 using OpCodes = System.Reflection.Emit.OpCodes;
 
 namespace Doorways.Internals.Patches
@@ -25,7 +24,7 @@ namespace Doorways.Internals.Patches
         /// <summary>
         /// Filled by <see cref="DoorwaysMod"/> constructors. 
         /// Doorways' indirect attribute loading mechanism
-        /// (see <see cref="LoadDoorwaysMod(Assembly, string)"/>) 
+        /// (see <see cref="LoadDoorwaysPlugin(Assembly, string)"/>) 
         /// creates <see cref="DoorwaysMod"/> instances which
         /// implicitly adds tagged mod content into this dictionary.
         /// <para/>
@@ -33,6 +32,23 @@ namespace Doorways.Internals.Patches
         /// mod content to the core engine.
         /// </summary>
         internal static Dictionary<string, DoorwaysMod> Mods = new Dictionary<string, DoorwaysMod>();
+
+        internal static (string, string) IsPluginPrefixTaken(string prefix)
+        {
+            foreach(DoorwaysMod mod in Mods.Values)
+            {
+                foreach (DoorwaysPlugin plugin in mod.plugins.Values)
+                {
+                    if (plugin.Prefix == prefix)
+                    {
+                        return (mod.ModName, plugin.Name);
+                    }
+                }
+            }
+            return (null, null);
+        }
+
+        #region Runs when mods are loaded
 
         /// <summary>
         /// Runs once for each enabled mod.
@@ -45,63 +61,51 @@ namespace Doorways.Internals.Patches
         [HarmonyPatch(typeof(DataFileLoader), nameof(DataFileLoader.LoadFilesFromAssignedFolder))]
         private static void PostLoadMod(DataFileLoader __instance)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
 
             var mod_root = Directory.GetParent(__instance.ContentFolder).FullName;
             var mod_id = new DirectoryInfo(mod_root).Name;
 
-            var synopsis = ParseDoorwaysMod(mod_root);
+            JObject synopsis = ParseDoorwaysMod(mod_root);
 
-            if (synopsis != null)
+            if (synopsis != null && synopsis.ContainsKey("doorways"))
             {
-                JObject dmeta = synopsis["doorways"] as JObject;
-                if (dmeta.ContainsKey("dll"))
-                {
-                    string dll_path;
-                    try
-                    {
-                        dll_path = Path.Combine(mod_root, dmeta["dll"].Value<string>());
-                    }
-                    catch (Exception)
-                    {
-                        _span.Error($"Could not load mod '{mod_id}'. Reason: Invalid manifest key: The key 'dll' must be a string.");
-                        return;
-                    }
+                DoorwaysMod mod = new DoorwaysMod(synopsis["name"].ToString());
 
-                    if (File.Exists(dll_path))
-                    {
-                        try
-                        {
-                            Assembly mod = Assembly.LoadFrom(dll_path);
-                            _span.Info($"Loading Doorways Plug-in Mod: '{mod.FullName}'");
-                            LoadDoorwaysMod(mod, mod_id);
-                        }
-                        catch (Exception e)
-                        {
-                            _span.Error($"Could not load mod '{mod_id}'. Reason: {e}.");
-                        }
-                        return;
-                    }
-                    _span.Error($"Could not load mod '{mod_id}'. Reason: Specified a DLL path that did not exist, \"{dll_path}\"");
+                // Load all mod plug-ins
+                foreach (DoorwaysPlugin loadedPlugin in LoadDoorwaysPluginsForMod(Path.Combine(mod_root, "content"), mod_id))
+                {
+                    mod.RegisterPlugin(loadedPlugin);
                 }
+
+                // TODO
+                // Load all mod JSON content
+                // Overwrite JSON pathways for this mod.
             }
         }
 
-        private static bool PostLoadCompendium_HasRun = false;
-        /// <summary>
-        /// Runs once after all mods have been loaded and after
-        /// the compendium has been initialized.
-        /// </summary>
-        [HarmonyPostfix]
-        [HarmonyPatch(typeof(CompendiumLoader), nameof(CompendiumLoader.PopulateCompendium))]
-        private static ContentImportLog PostLoadCompendium(ContentImportLog __result)
+        private static IEnumerable<DoorwaysPlugin> LoadDoorwaysPluginsForMod(string contentPath, string mod_id)
         {
-            if(PostLoadCompendium_HasRun) { return __result; }
-            PostLoadCompendium_HasRun = true;
-
-            Compendium compendium = Watchman.Get<Compendium>();
-            Mods.Values.ForEach((mod) => RegisterDoorwaysMod(mod, ref compendium, ref __result));
-            return __result;
+            var _span = Logger.Instance.Span();
+            foreach(FileInfo file in new DirectoryInfo(contentPath).GetFiles("*.dll"))
+            {
+                DoorwaysPlugin p = null;
+                try
+                {
+                    Assembly mod = Assembly.LoadFrom(file.FullName);
+                    if(mod.GetCustomAttribute<DoorwaysAttribute>() != null)
+                    {
+                        _span.Info($"Loading Doorways Plug-in '{mod.FullName}' for '{mod_id}'.");
+                        p = new DoorwaysPlugin(mod);
+                    }
+                }
+                catch (Exception e)
+                {
+                    _span.Error($"Could not load plugin '{file.FullName}' for '{mod_id}'. Reason: {e}.");
+                    continue;
+                }
+                yield return p;
+            }
         }
 
         /// <summary>
@@ -111,7 +115,7 @@ namespace Doorways.Internals.Patches
         /// </summary>
         private static JObject ParseDoorwaysMod(string mod_root)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
 
             // fast-exit if this is the core directory
             if (Directory.GetParent(mod_root).Name == "StreamingAssets")
@@ -136,65 +140,25 @@ namespace Doorways.Internals.Patches
             return null;
         }
 
+        #endregion
+
+        #region Runs when the Compendium is done loading
+
+        private static bool PostLoadCompendium_HasRun = false;
         /// <summary>
-        /// Registers a Doorways mod assembly into <see cref="Mods"/>
-        /// <para/>
-        /// In order to present your DLL as a Doorways mod, add
-        /// the [Doorways] attribute to its assembly properties.
-        /// <para/>
-        /// Doorways will automatically register any types that
-        /// derive from <see cref="AbstractEntity{T}"/> and
-        /// have the [<see cref="DoorwaysObjectAttribute"/>]
-        /// attribute. It will automatically construct any
-        /// types that inherit from <see cref="DoorwaysFactory"/>
-        /// and have the [<see cref="DoorwaysObjectAttribute"/>]
-        /// and register the Entities they produce.
+        /// Runs once after all mods have been loaded and after
+        /// the compendium has been initialized.
         /// </summary>
-        private static void LoadDoorwaysMod(Assembly mod, string mod_id)
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(CompendiumLoader), nameof(CompendiumLoader.PopulateCompendium))]
+        private static ContentImportLog PostLoadCompendium(ContentImportLog __result)
         {
-            var _span = Logger.Span();
+            if (PostLoadCompendium_HasRun) { return __result; }
+            PostLoadCompendium_HasRun = true;
 
-            var doorwaysModAttr = mod.GetCustomAttribute<DoorwaysAttribute>();
-
-            string ModName = doorwaysModAttr.Name ?? mod.FullName;
-            string ModPrefix = doorwaysModAttr.Prefix ?? mod_id;
-
-            // Instantiating this class automatically adds the instance
-            // to the doorways mod registry.
-            DoorwaysMod thisMod = new DoorwaysMod(ModName, ModPrefix);
-            _span.Info($"Detected Doorways Mod {thisMod.ModName} with baseid {thisMod.ModId}");
-
-            // Get all [DoorwaysObject]s in the assembly
-            IEnumerable<Type> types = mod.GetTypes();
-            foreach (Type t in types)
-            {
-                if (t.IsClass)
-                {
-                    // Determine if this is a valid entity we can register.
-                    _span.Debug($"Inspecting type '{t.Name}'");
-                    bool hasDoorwaysAttr = t.GetCustomAttribute<DoorwaysObjectAttribute>() != null;
-                    if(hasDoorwaysAttr)
-                    {
-                        bool isRegisterable = typeof(IEntityWithId).IsAssignableFrom(t);
-                        bool isFactory = typeof(DoorwaysFactory).IsAssignableFrom(t);
-                        _span.Debug($"  {t.Name}: (Registerable: {(isRegisterable ? "true" : "false")}, Factory: {(isFactory ? "true" : "false")})");
-
-                        if (isRegisterable)
-                        {
-                            thisMod.RegisterEntity(InstantiateStaticEntity(t));
-                        }
-                        else if (isFactory)
-                        {
-                            DoorwaysFactory factory = Activator.CreateInstance(t) as DoorwaysFactory;
-                            factory.GetAll().ForEach((entity) => thisMod.RegisterEntity(entity));
-                        }
-                        else
-                        {
-                            _span.Error($"Marked entity '{t.FullName}' does not derive from IEntityWithId or DoorwaysFactory and/or is not marked with the [DoorwaysObject] attribute, so it cannot be registered as game data.");
-                        }
-                    }
-                }
-            }
+            Compendium compendium = Watchman.Get<Compendium>();
+            Mods.Values.ForEach((mod) => RegisterDoorwaysMod(mod, ref compendium, ref __result));
+            return __result;
         }
 
         /// <summary>
@@ -207,21 +171,31 @@ namespace Doorways.Internals.Patches
         /// </summary>
         private static void RegisterDoorwaysMod(DoorwaysMod mod, ref Compendium compendium, ref ContentImportLog log)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
             try
             {
                 foreach (IEntityWithId entity in mod.registry.Values)
                 {
                     TryRegisterInstancedEntity(entity, mod.ModName, ref compendium, ref log);
                 }
+
+                foreach (DoorwaysPlugin plugin in mod.plugins.Values)
+                {
+                    foreach (IEntityWithId entity in plugin.registry.Values)
+                    {
+                        TryRegisterInstancedEntity(entity, mod.ModName + "." + plugin.Name, ref compendium, ref log);
+                    }
+                }
             }
             catch(Exception e)
             {
                 // Misbehaving mods don't get to be in the mod registry.
-                Mods.Remove(mod.ModId);
+                Mods.Remove(mod.ModName);
                 _span.Error($"Could not register content for Doorways mod '{mod.ModName}': {e}");
             }
         }
+
+        #endregion
 
         /// <summary>
         /// Instantiates a type into a concrete
@@ -229,9 +203,9 @@ namespace Doorways.Internals.Patches
         /// can be then registered in the game's
         /// compendium.
         /// </summary>
-        private static IEntityWithId InstantiateStaticEntity(Type t)
+        internal static IEntityWithId InstantiateStaticEntity(Type t)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
             try
             {
                 object obj = Activator.CreateInstance(t);
@@ -266,7 +240,7 @@ namespace Doorways.Internals.Patches
         /// </summary>
         private static void TryRegisterInstancedEntity(IEntityWithId entity, string modName, ref Compendium compendium, ref ContentImportLog contentImportLog)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
 
             // Set the ID to lowercase, since the game expects all IDs to be
             // lowercase-converted.
@@ -344,7 +318,7 @@ namespace Doorways.Internals.Patches
         [HarmonyPatch(typeof(Compendium), nameof(Compendium.InitialiseForEntityTypes))]
         private static IEnumerable<CodeInstruction> DontOverwriteEntityStores(IEnumerable<CodeInstruction> instructions)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
             FieldInfo entityStores = AccessTools.Field(typeof(Compendium), "entityStores");
             foreach (var instruction in instructions)
             {

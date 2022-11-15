@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Doorways;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -6,6 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine.Animations;
 
 public enum LogLevel
 {
@@ -35,8 +37,9 @@ public enum LogLevel
 /// about your log statements. See the documentation on <c>Logger::Span</c>
 /// for more information.
 /// </summary>
-public static class Logger
+public class Logger
 {
+    #region Static Init
     internal static LogLevel MinLogLevel;
 
     /// <summary>
@@ -52,13 +55,49 @@ public static class Logger
     ///     emitted. If it is set to <c>LogLevel.Info</c>, all 
     ///     messages will be emitted.
     /// </param>
-    public static void Initialize(LogLevel level = LogLevel.Info)
+    internal static void Initialize(LogLevel level = LogLevel.Info)
     {
         Logger.MinLogLevel = level;
     }
+    #endregion
+
+    // For internal convenience.
+    internal static Logger Instance { get; } = new Logger("Doorways");
+
+    private string LoggerName;
 
     /// <summary>
-    /// Clamp the current log level to a Core-compativle level.
+    /// Create a new Logger with an explicitly
+    /// declared logger name.
+    /// </summary>
+    public Logger(string loggerName)
+    {
+        LoggerName = loggerName;
+    }
+
+    /// <summary>
+    /// Create a new Logger with an auto-derived
+    /// logger name. If the calling assembly is a
+    /// Doorways Object with a set name, it will use
+    /// that name. Otherwise, it will use the calling
+    /// assembly name.
+    /// </summary>
+    public Logger()
+    {
+        Assembly caller = Assembly.GetCallingAssembly();
+        DoorwaysAttribute attr = caller.GetCustomAttribute<DoorwaysAttribute>();
+        if (attr != null && attr.Name != null)
+        {
+            LoggerName = attr.Name;
+        }
+        else
+        {
+            LoggerName = caller.GetName().Name;
+        }
+    }
+
+    /// <summary>
+    /// Clamp the current log level to a Core-compatible level.
     /// </summary>
     public static VerbosityLevel ClampedLogLevel()
     {
@@ -78,29 +117,28 @@ public static class Logger
         }
     }
 
-    private static string Format(string rootName, LogLevel level, string context, string format, params object[] args)
+    private string Format(LogLevel level, string context, string format, params object[] args)
     {
-        if (rootName == null) { rootName = Assembly.GetExecutingAssembly().GetName().Name; }
         if (context == null)
         {
-            return String.Concat("[", rootName, "]", level.ToString(), ": ", String.Format(format, args));
+            return String.Concat("[", LoggerName, "]", level.ToString(), ": ", String.Format(format, args));
         }
         else
         {
-            return String.Concat("[", rootName, ":", context, "]", level.ToString(), ": ", String.Format(format, args));
+            return String.Concat("[", LoggerName, ":", context, "]", level.ToString(), ": ", String.Format(format, args));
         }
     }
 
-    public static void Log(LogLevel level, string format, params object[] args)
+    public void Log(LogLevel level, string format, params object[] args)
     {
-        Logger.Log(null, level, null, format, args);
+        Log(null, level, null, format, args);
     }
 
-    public static void Log(string rootName, LogLevel level, string context, string format, params object[] args)
+    public void Log(string rootName, LogLevel level, string context, string format, params object[] args)
     {
         if ((int)level >= (int)MinLogLevel)
         {
-            string message = Logger.Format(rootName, level, context, format, args);
+            string message = Format(level, context, format, args);
             switch (level)
             {
                 case LogLevel.Error:
@@ -130,54 +168,54 @@ public static class Logger
     /// game log with the "Error" text. For irrecoverable errors,
     /// throw an exception.
     /// </summary>
-    public static void Error(string format, params object[] args)
+    public void Error(string format, params object[] args)
     {
-        Logger.Log(LogLevel.Error, format, args);
+        Log(LogLevel.Error, format, args);
     }
 
-    public static void Error(object item)
+    public void Error(object item)
     {
-        Logger.Error("{}", item);
+        Error("{}", item);
     }
 
-    public static void Warn(string format, params object[] args)
+    public void Warn(string format, params object[] args)
     {
-        Logger.Log(LogLevel.Warn, format, args);
+        Log(LogLevel.Warn, format, args);
     }
 
-    public static void Warn(object item)
+    public void Warn(object item)
     {
-        Logger.Warn("{}", item);
+        Warn("{}", item);
     }
 
-    public static void Info(string format, params object[] args)
+    public void Info(string format, params object[] args)
     {
-        Logger.Log(LogLevel.Info, format, args);
+        Log(LogLevel.Info, format, args);
     }
 
-    public static void Info(object item)
+    public void Info(object item)
     {
-        Logger.Info("{}", item);
+        Info("{}", item);
     }
 
-    public static void Debug(string format, params object[] args)
+    public void Debug(string format, params object[] args)
     {
-        Logger.Log(LogLevel.Debug, format, args);
+        Log(LogLevel.Debug, format, args);
     }
 
-    public static void Debug(object item)
+    public void Debug(object item)
     {
-        Logger.Debug("{}", item);
+        Debug("{}", item);
     }
 
-    public static void Trace(string format, params object[] args)
+    public void Trace(string format, params object[] args)
     {
-        Logger.Log(LogLevel.Trace, format, args);
+        Log(LogLevel.Trace, format, args);
     }
 
-    public static void Trace(object item)
+    public void Trace(object item)
     {
-        Logger.Trace("{}", item);
+        Trace("{}", item);
     }
 
     /// <summary>
@@ -187,15 +225,20 @@ public static class Logger
     /// and include that information in log statements
     /// automatically.
     /// </summary>
-    public static Span Span([CallerMemberName] string memberName = "", string rootName = null)
+    public Span Span([CallerMemberName] string memberName = "", string rootName = null)
     {
         MethodBase mth = new StackTrace().GetFrame(1).GetMethod();
         string cls = mth.ReflectedType.Name;
-        return new Span(String.Concat(cls, ".", memberName), rootName);
+        return new Span(this, String.Concat(cls, ".", memberName), rootName);
     }
 
-    private static Span _UnityExplorerSpan = new Span("UEXP");
-    internal static void LogUnityExplorer(string message, UnityEngine.LogType severity)
+    private static Span _UnityExplorerSpan;
+    internal Action<string, UnityEngine.LogType> GetUnityExplorerListener()
+    {
+        _UnityExplorerSpan = this.Span("UEXP");
+        return LogUnityExplorer;
+    }
+    private static void LogUnityExplorer(string message, UnityEngine.LogType severity)
     {
         switch (severity)
         {
@@ -211,7 +254,6 @@ public static class Logger
                 break;
             case UnityEngine.LogType.Exception:
                 throw new Exception(message);
-                break;
             default:
                 _UnityExplorerSpan.Warn("UNKNOWN LOGLEVEL: {0}", message);
                 break;
@@ -234,15 +276,18 @@ public class Span
     public string Context { get; private set; }
     public string Assembly { get; private set; }
 
-    public Span(string context, string assembly = null)
+    public Logger Parent { get; private set; }
+
+    internal Span(Logger parent, string context, string assembly = null)
     {
+        Parent = parent;
         Context = context;
         Assembly = assembly;
     }
 
     public void Log(LogLevel level, string format, params object[] args)
     {
-        Logger.Log(this.Assembly, level, this.Context, format, args);
+        Parent.Log(this.Assembly, level, this.Context, format, args);
     }
 
     /// <summary>

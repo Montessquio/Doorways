@@ -32,5 +32,5 @@ set all patch functions as `private` and restrict access
 to them with some public API functions which check
 invariants and perform runtime assertions.
 
-Please, *please* use `Logger.Span` to log your messages.
+Please, *please* use `Logger.Instance.Span` to log your messages.
 Your future self will thank you, as will future me.

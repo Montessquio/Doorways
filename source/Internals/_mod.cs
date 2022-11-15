@@ -14,10 +14,10 @@ namespace Doorways.Internals
     {
         public static void Initialize()
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
 
             _span.Debug("Initializing UniverseLib...");
-            UniverseLib.Universe.Init(logHandler: Logger.LogUnityExplorer);
+            UniverseLib.Universe.Init(logHandler: Logger.Instance.GetUnityExplorerListener());
 
             _span.Debug("Initializing patch modules...");
             Patches._mod.Initialize();

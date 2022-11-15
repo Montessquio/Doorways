@@ -14,7 +14,7 @@ namespace sh.monty.doorways.Patches
         private static bool DidPatchAlready = false;
         public static void Patch(Harmony patcher)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 if(assembly.GetName().Name == "TheRoostMachine")
@@ -75,7 +75,7 @@ namespace sh.monty.doorways.Patches
 
         private class DoorwaysInjections
         {
-            private static Span _span = Logger.Span("Initialise", "Roost");
+            private static Span _span = Logger.Instance.Span("Initialise", "Roost");
             public  static void InitialisePrefix(ref Stopwatch __state)
             {
                 __state = new Stopwatch();
@@ -118,7 +118,7 @@ namespace sh.monty.doorways.Patches
         {
             public static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions)
             {
-                var _span = Logger.Span();
+                var _span = Logger.Instance.Span();
                 bool found = false;
                 foreach (var instruction in instructions)
                 {

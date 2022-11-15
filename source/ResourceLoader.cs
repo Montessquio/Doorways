@@ -50,7 +50,7 @@ class ResourceLoader
     /// </summary>
     public static Sprite LoadImage(string imagePath)
     {
-        Logger.Info("Loading dynamic image from path: " + Path.Combine(AssetDirectory, imagePath));
+        Logger.Instance.Info("Loading dynamic image from path: " + Path.Combine(AssetDirectory, imagePath));
         byte[] bytes = File.ReadAllBytes(Path.Combine(AssetDirectory, imagePath));
 
         // Texture dimensions will be overridden on load

@@ -50,7 +50,7 @@ namespace sh.monty.doorways.Patches.SecretHistories
         /// </summary>
         public static Dictionary<string, ElementDecayOverrider> LateDecayOverrides = new Dictionary<string, ElementDecayOverrider>();
 
-        private static Span _span = Logger.Span("InterceptDecay");
+        private static Span _span = Logger.Instance.Span("InterceptDecay");
 
         [HarmonyPostfix]
         [HarmonyPatch(typeof(Element), "get_DecayTo")]

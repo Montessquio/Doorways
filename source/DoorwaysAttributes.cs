@@ -3,6 +3,7 @@ using SecretHistories.Fucine;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -106,7 +107,13 @@ namespace Doorways
     {
         public string Name = null;
         public string Prefix = null;
-
+        
         public DoorwaysAttribute() { }
     }
+
+    /// <summary>
+    /// The attached static method should be run when the mod is loaded.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    public class DoorwaysInitAttribute : Attribute {}
 }

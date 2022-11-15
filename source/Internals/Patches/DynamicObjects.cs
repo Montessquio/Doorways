@@ -27,7 +27,7 @@ namespace Doorways.Internals.Patches
         [HarmonyPatch(typeof(Situation), nameof(Situation.TransitionToState))]
         private static void TransitionPrefix(SituationState newState, Situation __instance)
         {
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
 
             SituationState originalState = __instance.State;
             _span.Info($"Situation {__instance.CurrentRecipe.Id} is transitioning from {originalState.Identifier} to {newState.Identifier}");

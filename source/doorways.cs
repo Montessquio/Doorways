@@ -17,7 +17,7 @@ public static class DoorwaysFramework
             stopwatch.Start();
 
             Logger.Initialize(LogLevel.Trace);
-            var _span = Logger.Span();
+            var _span = Logger.Instance.Span();
             _span.Info("Strike the Earth!");
 
             // Uncomment to create a harmony log file on your Desktop.
@@ -35,7 +35,7 @@ public static class DoorwaysFramework
                 try
                 {
                     _span.Info("Initializing UnityExplorer");
-                    UnityExplorer.ExplorerStandalone.CreateInstance(Logger.LogUnityExplorer);
+                    UnityExplorer.ExplorerStandalone.CreateInstance(Logger.Instance.GetUnityExplorerListener());
                 }
                 catch (Exception e)
                 {
