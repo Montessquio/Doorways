@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Doorways.Events;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,6 +22,9 @@ namespace Doorways.Internals
 
             _span.Debug("Initializing patch modules...");
             Patches._mod.Initialize();
+
+            _span.Debug("Initializing miscellaneous modules...");
+            SceneEvent.UhOSceneInit += UhOScene.OnUhOSceneInit;
 
             _span.Debug("Internals initialization complete.");
         }

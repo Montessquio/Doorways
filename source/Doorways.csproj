@@ -401,15 +401,17 @@
     <Compile Include="Entities\RecipeLink.cs" />
     <Compile Include="Entities\Slot.cs" />
     <Compile Include="Entities\XTrigger.cs" />
+    <Compile Include="Events\DoorwaysEventHandler.cs" />
+    <Compile Include="Events\SceneEvent.cs" />
     <Compile Include="IDoorwaysMod.cs" />
     <Compile Include="Internals\Patches\DynamicObjects.cs" />
     <Compile Include="Internals\Patches\ModLoader.cs" />
     <Compile Include="Internals\Patches\OverrideAttributePatches.cs" />
     <Compile Include="Internals\Patches\RoostCompat.cs" />
     <Compile Include="Internals\Patches\DecayInterceptPatches.cs" />
-    <Compile Include="Internals\Patches\CoreEvents.cs" />
     <Compile Include="Internals\Patches\LogPatcher.cs" />
     <Compile Include="Internals\Patches\_mod.cs" />
+    <Compile Include="Internals\UhOScene.cs" />
     <Compile Include="Internals\_mod.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -423,9 +425,6 @@
   <ItemGroup>
     <Content Include="Internals\Patches\README.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Events\" />
-    <Folder Include="Internals\Loader\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
