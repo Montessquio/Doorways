@@ -6,9 +6,11 @@ using SecretHistories.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using UIWidgets.Extensions;
 using UniverseLib;
 using OpCodes = System.Reflection.Emit.OpCodes;
@@ -63,6 +65,8 @@ namespace Doorways.Internals.Patches
         private static void PostLoadMod(DataFileLoader __instance)
         {
             var _span = Logger.Instance.Span();
+            Stopwatch timer = new Stopwatch();
+            timer.Start();
 
             var mod_root = Directory.GetParent(__instance.ContentFolder).FullName;
             var mod_id = new DirectoryInfo(mod_root).Name;
@@ -106,9 +110,16 @@ namespace Doorways.Internals.Patches
                 // TODO
                 // Load all mod JSON content
                 // Overwrite JSON pathways for this mod.
+
+                timer.Stop();
+                _span.Info($"Loaded Doorways mod {mod.ModName} in {timer.ElapsedMilliseconds}ms");
             }
         }
 
+        /// <summary>
+        /// Iterates through all the DLLs in the mod content
+        /// folder and tries to load them as Doorways plug-ins for that mod.
+        /// </summary>
         private static IEnumerable<DoorwaysPlugin> LoadDoorwaysPluginsForMod(string contentPath, string mod_id)
         {
             var _span = Logger.Instance.Span();
@@ -120,8 +131,10 @@ namespace Doorways.Internals.Patches
                     Assembly mod = Assembly.LoadFrom(file.FullName);
                     if(mod.GetCustomAttribute<DoorwaysAttribute>() != null)
                     {
-                        _span.Info($"Loading Doorways Plug-in '{mod.FullName}' for '{mod_id}'.");
+                        _span.Debug($"Loading Doorways Plug-in '{mod.GetName().Name}' for '{mod_id}'.");
                         p = new DoorwaysPlugin(mod);
+                        // Attempt to apply all our Plugin Patches to our assembly.
+                        PatchDoorwaysPlugin(p);
                     }
                 }
                 catch (Exception e)
@@ -163,6 +176,16 @@ namespace Doorways.Internals.Patches
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Apply harmony patches to a plugin Assembly.
+        /// This is where all patches that target plugins
+        /// should be called.
+        /// </summary>
+        private static void PatchDoorwaysPlugin(DoorwaysPlugin plugin)
+        {
+            OverrideAttributePatches.ApplyPatches(plugin.PluginAssembly);
         }
 
         #endregion

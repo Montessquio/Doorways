@@ -94,10 +94,9 @@ namespace Doorways
             ModLoader.Mods.Add(ModName, this);
         }
 
-        public DoorwaysMod(string modPrefix)
+        public DoorwaysMod(string modName)
         {
-            Assembly mod = Assembly.GetCallingAssembly();
-            ModName = mod.FullName;
+            ModName = modName;
 
             if (ModLoader.Mods.ContainsKey(ModName))
             {
@@ -203,7 +202,7 @@ namespace Doorways
 
             var doorwaysModAttr = PluginAssembly.GetCustomAttribute<DoorwaysAttribute>();
 
-            string PluginName = doorwaysModAttr.Name ?? PluginAssembly.FullName;
+            string PluginName = doorwaysModAttr.Name ?? PluginAssembly.GetName().Name;
             string PluginPrefix = doorwaysModAttr.Prefix ?? PluginName.ToLower();
 
             // Instantiating this class automatically adds the instance
@@ -220,7 +219,7 @@ namespace Doorways
                     if (hasDoorwaysAttr)
                     {
                         bool isRegisterable = typeof(IEntityWithId).IsAssignableFrom(t);
-                        bool isFactory = typeof(DoorwaysFactory).IsAssignableFrom(t);
+                        bool isFactory = typeof(IDoorwaysFactory).IsAssignableFrom(t);
                         _span.Debug($"  {t.Name}: (Registerable: {(isRegisterable ? "true" : "false")}, Factory: {(isFactory ? "true" : "false")})");
 
                         if (isRegisterable)
@@ -229,7 +228,7 @@ namespace Doorways
                         }
                         else if (isFactory)
                         {
-                            DoorwaysFactory factory = Activator.CreateInstance(t) as DoorwaysFactory;
+                            IDoorwaysFactory factory = Activator.CreateInstance(t) as IDoorwaysFactory;
                             factory.GetAll().ForEach((entity) => RegisterEntity(entity));
                         }
                         else

@@ -18,9 +18,10 @@ using static UnityEngine.EventSystems.EventTrigger;
 
 namespace Doorways.Entities
 {
-    public abstract class Card : Element, IForcedSuperclass<Element>, INamespacedIDEntity
+    public abstract class Card : Element, INamespacedIDEntity, IInheritOverride<Element>
     {
-        public virtual string EntityId { get; set; } = null;
+        // This exact field is inherited from AbstractEntity<>
+        //public virtual string Id { get; protected set; } = null;
 
         public abstract new string Label { get; set; }
         public abstract new string Description { get; set; }
@@ -42,43 +43,24 @@ namespace Doorways.Entities
                 _icon = value;
             }
         }
-
         public virtual new string VerbIcon { get; set; } = "";
-
         public virtual new string DecayTo { get; set; } = "";
-
         public virtual new string BurnTo { get; set; } = "";
-
         public virtual new string DrownTo { get; set; } = "";
-
         public virtual new string UniquenessGroup { get; set; } = "";
-
         public virtual new bool Resaturate { get; set; } = false;
-
         public virtual new bool IsHidden { get; set; } = false;
-
         public virtual new bool NoArtNeeded { get; set; } = false;
-
         public virtual new bool Metafictional { get; set; } = false;
-
         public virtual new string ManifestationType { get; private set; } = "Card";
-
         public virtual new List<string> Achievements { get; set; } = new List<string>();
-
         public virtual new bool Unique { get; set; } = false;
-
         public virtual new float Lifetime { get; set; } = 0;
-
         public virtual new string Inherits { get; set; } = "";
-
         public virtual new AspectsDictionary Aspects { get; set; } = new AspectsDictionary();
-
         public virtual new List<Slot> Slots { get; set; } = new List<Slot>();
-
         public virtual new List<RecipeLink> Induces { get; set; } = new List<RecipeLink>();
-
         public virtual new Dictionary<string, List<XTrigger>> XTriggers { get; set; } = new Dictionary<string, List<XTrigger>>();
-
         public new AspectsDictionary AspectsIncludingSelf
         {
             get
@@ -97,72 +79,23 @@ namespace Doorways.Entities
                 return aspectsDictionary;
             }
         }
-
         public new bool Decays => Lifetime > 0f;
+        public new bool IsAspect { get; } = false;
 
-        public new bool IsAspect { get; } = true;
+        public Card(EntityData importDataForEntity, ContentImportLog log) : base(importDataForEntity, log) { }
 
-        public Card(EntityData importDataForEntity, ContentImportLog log)
-            : base(importDataForEntity, log)
-        {
-            if(EntityId != null)
-            {
-                base.SetId(EntityId);
-            }
-        }
+        public Card(ContentImportLog log) : base(new EntityData(), log) { }
 
-        public Card(ContentImportLog log) : base(new EntityData(), log)
-        {
-            if (EntityId != null)
-            {
-                base.SetId(EntityId);
-            }
-        }
-
-        public Card() : base(new EntityData(), new ContentImportLog())
-        {
-            if (EntityId != null)
-            {
-                base.SetId(EntityId);
-            }
-        }
-
-        private new void InheritFrom(Element inheritFromElement)
-        {
-            Aspects.CombineAspects(inheritFromElement.Aspects);
-            foreach (string key in inheritFromElement.XTriggers.Keys)
-            {
-                XTriggers.Add(key, inheritFromElement.XTriggers[key].ConvertAll((morph) => new XTrigger(morph)));
-            }
-
-            foreach (Slot slot in inheritFromElement.Slots)
-            {
-                Slots.Add(slot);
-            }
-
-            foreach (RecipeLink induce in inheritFromElement.Induces)
-            {
-                Induces.Add(induce);
-            }
-
-            ManifestationType = inheritFromElement.ManifestationType;
-            if (string.IsNullOrEmpty(Description))
-            {
-                Description = inheritFromElement.Description;
-            }
-
-            UniquenessGroup = inheritFromElement.UniquenessGroup;
-        }
+        public Card() : base(new EntityData(), new ContentImportLog()) { }
 
         public virtual void CanonicalizeIds(FnCanonicalize Canonicalize, string prefix)
         {
-            if (EntityId == null || EntityId == "id")
+            if (Id == null || Id == "id")
             {
-                EntityId = this.GetActualType().Name;
+                Id = this.GetActualType().Name;
             }
 
-            EntityId = Canonicalize(EntityId);
-            SetId(EntityId);
+            Id = Canonicalize(Id);
             DecayTo = Canonicalize(DecayTo);
             BurnTo = Canonicalize(BurnTo);
             DrownTo = Canonicalize(DrownTo);

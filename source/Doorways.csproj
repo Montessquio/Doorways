@@ -404,6 +404,7 @@
     <Compile Include="IDoorwaysMod.cs" />
     <Compile Include="Internals\Patches\DynamicObjects.cs" />
     <Compile Include="Internals\Patches\ModLoader.cs" />
+    <Compile Include="Internals\Patches\OverrideAttributePatches.cs" />
     <Compile Include="Internals\Patches\RoostCompat.cs" />
     <Compile Include="Internals\Patches\DecayInterceptPatches.cs" />
     <Compile Include="Internals\Patches\CoreEvents.cs" />

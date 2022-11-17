@@ -56,22 +56,25 @@ namespace sh.monty.doorways.Patches.SecretHistories
         [HarmonyPatch(typeof(Element), "get_DecayTo")]
         private static string InterceptDecay(string oldDecayTargetID, Element __instance)
         {
-            string newTargetID = oldDecayTargetID;
-
-            if (DecayOverrides.ContainsKey(__instance.Id))
+            if (__instance != null && __instance.Id != null && oldDecayTargetID != null)
             {
-                newTargetID = DecayOverrides[__instance.Id](__instance.Id, oldDecayTargetID);
-                _span.Trace($"Intercepted Decay: '{__instance.Id}' will decay to '{newTargetID}' instead of '{oldDecayTargetID}'");
-            }
-            // Check for a LateDecayOverride
-            if (LateDecayOverrides.ContainsKey(newTargetID))
-            {
-                string lateTargetID = LateDecayOverrides[newTargetID](__instance.Id, newTargetID);
-                _span.Trace($"Intercepted LateDecay: '{__instance.Id}' will decay to '{lateTargetID}' instead of '{newTargetID}'");
-                return lateTargetID;
-            }
+                string newTargetID = oldDecayTargetID;
+                if (DecayOverrides.ContainsKey(__instance.Id))
+                {
+                    newTargetID = DecayOverrides[__instance.Id](__instance.Id, oldDecayTargetID);
+                    _span.Trace($"Intercepted Decay: '{__instance.Id}' will decay to '{newTargetID}' instead of '{oldDecayTargetID}'");
+                }
+                // Check for a LateDecayOverride
+                if (LateDecayOverrides.ContainsKey(newTargetID))
+                {
+                    string lateTargetID = LateDecayOverrides[newTargetID](__instance.Id, newTargetID);
+                    _span.Trace($"Intercepted LateDecay: '{__instance.Id}' will decay to '{lateTargetID}' instead of '{newTargetID}'");
+                    return lateTargetID;
+                }
 
-            return newTargetID;
+                return newTargetID;
+            }
+            return oldDecayTargetID;
         }
     }
 }

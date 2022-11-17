@@ -15,8 +15,7 @@ namespace Doorways.Internals.Patches
     /// </summary>
     internal class _mod
     {
-        private static Harmony globalPatcher = new Harmony("DoorwaysFramework");
-        internal static Harmony GlobalPatcher { get { return globalPatcher; } }
+        internal static Harmony GlobalPatcher { get; } = new Harmony("DoorwaysFramework");
 
         public static void Initialize()
         {
