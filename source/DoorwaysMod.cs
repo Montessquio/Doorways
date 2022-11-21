@@ -53,11 +53,6 @@ namespace Doorways
             {
                 throw new ArgumentException($"The mod {ModName} has already registered a plugin with ID {p.Prefix}");
             }
-            var (otherMod, otherPlugin) = ModLoader.IsPluginPrefixTaken(p.Prefix);
-            if(otherMod != null)
-            {
-                throw new ArgumentException($"The mod {otherMod} has already registered a plugin with ID {otherPlugin}");
-            }
 
             plugins.Add(p.Prefix, p);
             _span.Debug($"Loaded Plugin '{p.Name}' for mod '{ModName}' as '{p.Prefix}'");
@@ -70,11 +65,6 @@ namespace Doorways
             if (plugins.ContainsKey(p.Prefix))
             {
                 throw new ArgumentException($"The mod {ModName} has already registered a plugin with ID {p.Prefix}");
-            }
-            var (otherMod, otherPlugin) = ModLoader.IsPluginPrefixTaken(p.Prefix);
-            if (otherMod != null)
-            {
-                throw new ArgumentException($"The mod {otherMod} has already registered a plugin with ID {otherPlugin}");
             }
 
             plugins.Add(p.Prefix, p);
