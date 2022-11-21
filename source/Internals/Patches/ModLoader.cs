@@ -1,5 +1,7 @@
 ﻿using Assets.Scripts.Application.Entities.NullEntities;
+using Hjson;
 using HarmonyLib;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SecretHistories.Fucine;
 using SecretHistories.UI;
@@ -14,6 +16,10 @@ using System.Runtime.CompilerServices;
 using UIWidgets.Extensions;
 using UniverseLib;
 using OpCodes = System.Reflection.Emit.OpCodes;
+using System.Text;
+using SecretHistories.Fucine.DataImport;
+using SecretHistories.Constants.Modding;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Doorways.Internals.Patches
 {
@@ -59,10 +65,14 @@ namespace Doorways.Internals.Patches
         /// Checks the mod synopsis to see if it's a Doorways
         /// mod; if it is, it reads all doorways data out of it
         /// and into the mods registry (<see cref="Mods"/>)
+        /// <para/>
+        /// <see cref="=PostLoadCompendium"/>PostLoadCompendium</see> is run after
+        /// this method, when the compendium is done being loaded.
         /// </summary>
-        [HarmonyPostfix]
+        [HarmonyPrefix]
+        [HarmonyPriority(int.MaxValue)] // We want to run absolutely, positively first.
         [HarmonyPatch(typeof(DataFileLoader), nameof(DataFileLoader.LoadFilesFromAssignedFolder))]
-        private static void PostLoadMod(DataFileLoader __instance)
+        private static bool PostLoadMod(DataFileLoader __instance, ref List<LoadedDataFile> ____loadedContentFiles)
         {
             var _span = Logger.Instance.Span();
             Stopwatch timer = new Stopwatch();
@@ -75,7 +85,16 @@ namespace Doorways.Internals.Patches
 
             if (synopsis != null && synopsis.ContainsKey("doorways"))
             {
-                DoorwaysMod mod = new DoorwaysMod(synopsis["name"].ToString());
+                string ModPrefix = null;
+                if (   synopsis["doorways"].Type == JTokenType.Object 
+                    && ((JObject)synopsis["doorways"]).ContainsKey("prefix")
+                    && ((JObject)synopsis["doorways"])["prefix"].Type == JTokenType.String
+                   )
+                {
+                    ModPrefix = ((JObject)synopsis["doorways"])["prefix"].ToString();
+                }
+                DoorwaysMod mod = new DoorwaysMod(mod_id, ModPrefix);
+                _span.Info($"Loading Doorways Mod '{mod.ModName}' with prefix '{mod.ModPrefix}' from {mod_root}");
 
                 // Load all mod plug-ins
                 foreach (DoorwaysPlugin loadedPlugin in LoadDoorwaysPluginsForMod(Path.Combine(mod_root, "content"), mod_id))
@@ -107,13 +126,14 @@ namespace Doorways.Internals.Patches
                     }
                 }
 
-                // TODO
-                // Load all mod JSON content
-                // Overwrite JSON pathways for this mod.
+                LoadAlternateDataFormats(mod, __instance, ref ____loadedContentFiles);
 
                 timer.Stop();
                 _span.Info($"Loaded Doorways mod {mod.ModName} in {timer.ElapsedMilliseconds}ms");
+
+                return false; // Don't allow Core to load this mod if Doorways already did it well.
             }
+            return true; // Original should run for all doorways mods
         }
 
         /// <summary>
@@ -205,7 +225,7 @@ namespace Doorways.Internals.Patches
             PostLoadCompendium_HasRun = true;
 
             Compendium compendium = Watchman.Get<Compendium>();
-            Mods.Values.ForEach((mod) => RegisterDoorwaysMod(mod, ref compendium, ref __result));
+            Mods.Values.ForEach((mod) => RegisterDoorwaysPlugins(mod, ref compendium, ref __result));
             return __result;
         }
 
@@ -217,16 +237,11 @@ namespace Doorways.Internals.Patches
         /// and instead simply emit an error in the log
         /// with exception information.
         /// </summary>
-        private static void RegisterDoorwaysMod(DoorwaysMod mod, ref Compendium compendium, ref ContentImportLog log)
+        private static void RegisterDoorwaysPlugins(DoorwaysMod mod, ref Compendium compendium, ref ContentImportLog log)
         {
             var _span = Logger.Instance.Span();
             try
             {
-                foreach (IEntityWithId entity in mod.registry.Values)
-                {
-                    TryRegisterInstancedEntity(entity, mod.ModName, ref compendium, ref log);
-                }
-
                 foreach (DoorwaysPlugin plugin in mod.plugins.Values)
                 {
                     foreach (IEntityWithId entity in plugin.registry.Values)
@@ -330,8 +345,6 @@ namespace Doorways.Internals.Patches
                 .MakeGenericMethod(entity.GetUnderlyingElement())
                 .Invoke(compendium, new object[] { entity.Id });
         }
-        
-
         #endregion
 
         #region Core Compat Patches
@@ -387,6 +400,127 @@ namespace Doorways.Internals.Patches
                 {
                     yield return instruction;
                 }
+            }
+        }
+
+        private static List<string> GetContentFilesRecursive(string path, string extension)
+        {
+            List<string> list = new List<string>();
+            if (Directory.Exists(path))
+            {
+                list.AddRange(Directory.GetFiles(path).ToList().FindAll((string f) => f.EndsWith(extension)));
+                string[] directories = Directory.GetDirectories(path);
+                foreach (string path2 in directories)
+                {
+                    list.AddRange(GetContentFilesRecursive(path2, extension));
+                }
+            }
+
+            return list;
+        }
+
+        private static void LoadAlternateDataFormats(DoorwaysMod mod, DataFileLoader __instance, ref List<LoadedDataFile> ____loadedContentFiles)
+        {
+            var _span = Logger.Instance.Span();
+            _span.Debug($"Loading alternate textual content formats for {mod.ModName}");
+
+            // Try to load JSON files
+            foreach (LoadedDataFile item in LoadJSONContent(__instance))
+            {
+                ____loadedContentFiles.Add(mod.CanonicalizeId(item));
+            }
+
+            // Try to load HJSON files
+            foreach (LoadedDataFile item in LoadHJSONContent(__instance))
+            {
+                ____loadedContentFiles.Add(mod.CanonicalizeId(item));
+            }
+        }
+
+        private static IEnumerable<LoadedDataFile> LoadJSONContent(DataFileLoader __instance)
+        {
+            var _span = Logger.Instance.Span();
+
+            var contentFilePaths = GetContentFilesRecursive(__instance.ContentFolder, ".json");
+            if (contentFilePaths.Any())
+            {
+                contentFilePaths.Sort();
+            }
+
+            foreach (string contentFilePath in contentFilePaths)
+            {
+                if (new FileInfo(contentFilePath).Length < 8)
+                {
+                    continue;
+                }
+
+                LoadedDataFile item = null;
+                try
+                {
+                    using (StreamReader reader = File.OpenText(contentFilePath))
+                    {
+                        using (JsonTextReader reader2 = new JsonTextReader(reader))
+                        {
+                            JProperty jProperty = ((JObject)JToken.ReadFrom(reader2)).Properties().First();
+                            item = new LoadedDataFile(contentFilePath, jProperty, jProperty.Name);
+                            _span.Debug($"Loaded '{contentFilePath}' as '{item.EntityTag}' with {((JArray)item.EntityContainer.Value).Count} members");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _span.Error("Problem parsing JSON file at " + contentFilePath + ": " + ex.Message);
+                }
+
+                if (item == null)
+                {
+                    continue;
+                }
+                yield return item;
+            }
+        }
+        
+        private static IEnumerable<LoadedDataFile> LoadHJSONContent(DataFileLoader __instance)
+        {
+            var _span = Logger.Instance.Span();
+
+            var contentFilePaths = GetContentFilesRecursive(__instance.ContentFolder, ".hjson");
+            if (contentFilePaths.Any())
+            {
+                contentFilePaths.Sort();
+            }
+
+            foreach (string contentFilePath in contentFilePaths)
+            {
+                if (new FileInfo(contentFilePath).Length < 8)
+                {
+                    continue;
+                }
+
+                LoadedDataFile item = null;
+                try
+                {
+                    // Load HJson from the file, and then convert it to JSON with ToString();
+                    using (StreamReader reader = new StreamReader(new MemoryStream(Encoding.UTF8.GetBytes(HjsonValue.Load(contentFilePath).ToString()))))
+                    {
+                        using (JsonTextReader reader2 = new JsonTextReader(reader))
+                        {
+                            JProperty jProperty = ((JObject)JToken.ReadFrom(reader2)).Properties().First();
+                            item = new LoadedDataFile(contentFilePath, jProperty, jProperty.Name);
+                            _span.Debug($"Loaded '{contentFilePath}' as '{item.EntityTag}' with {((JArray)item.EntityContainer.Value).Count} members");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _span.Error("Problem parsing HJSON file at " + contentFilePath + ": " + ex.Message);
+                }
+
+                if(item == null)
+                {
+                    continue;
+                }
+                yield return item;
             }
         }
 

@@ -3,19 +3,15 @@ using Doorways.Entities.Mixins;
 using Doorways.Internals.Patches;
 using HarmonyLib;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
+using SecretHistories.Constants.Modding;
 using SecretHistories.Entities;
 using SecretHistories.Fucine;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using UIWidgets.Extensions;
 using UniverseLib;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-using static UnityEngine.EventSystems.EventTrigger;
 
 namespace Doorways
 {
@@ -25,24 +21,10 @@ namespace Doorways
     public class DoorwaysMod
     {
         public string ModName { get; private set; }
+        public string ModPrefix { get; private set; }
 
         // Holds the raw data from every plugin, as well as all their static defs.
         internal Dictionary<string, DoorwaysPlugin> plugins { get; private set; } = new Dictionary<string, DoorwaysPlugin>();
-
-        // This registry holds top-level defs, i.e. raw JSON defs not produced by any plugin.
-        internal Dictionary<string, IEntityWithId> registry = new Dictionary<string, IEntityWithId>();
-
-        public void RegisterEntity(IEntityWithId entity)
-        {
-            var _span = Logger.Instance.Span();
-
-            if (registry.ContainsKey(entity.Id))
-            {
-                throw new ArgumentException($"The mod {ModName} has already registered an entity with ID {entity.Id}");
-            }
-            registry.Add(entity.Id, entity);
-            _span.Debug($"Loaded Entity '{entity.Id}'/'{entity.Id}' for mod '{ModName}' as '{entity.GetUnderlyingElement().Name}'");
-        }
 
         public void RegisterPlugin(Assembly pluginAssembly)
         {
@@ -81,29 +63,57 @@ namespace Doorways
             _span.Debug($"Loaded Plugin '{p.Name}' for mod '{ModName}' as '{p.Prefix}'");
         }
 
-        public DoorwaysMod()
+        public DoorwaysMod(string modName, string prefix = null)
         {
-            Assembly mod = Assembly.GetCallingAssembly();
-            ModName = mod.FullName;
+            ModName = modName;
+            ModPrefix = prefix ?? ModName.ToLower().Replace(" ", "");
 
             if (ModLoader.Mods.ContainsKey(ModName))
             {
                 DoorwaysMod other = ModLoader.Mods[ModName];
                 throw new ArgumentException($"Could not register {ModName}: the mod name has already been claimed.");
             }
+
             ModLoader.Mods.Add(ModName, this);
         }
 
-        public DoorwaysMod(string modName)
+        public string CanonicalizeId(string rawid)
         {
-            ModName = modName;
+            var _span = Logger.Instance.Span();
 
-            if (ModLoader.Mods.ContainsKey(ModName))
+            if (rawid == null) { return null; }
+
+            // If the entity id starts with a dot, we need to
+            // remove the dot and allow the remaining ID through as-is.
+            if (rawid.StartsWith("."))
             {
-                DoorwaysMod other = ModLoader.Mods[ModName];
-                throw new ArgumentException($"Could not register {ModName}: the mod name has already been claimed.");
+                rawid = rawid.Substring(1);
             }
-            ModLoader.Mods.Add(ModName, this);
+            // If it's not designated as a literal ID,
+            // we need to prepend its mod's prefix.
+            else
+            {
+                rawid = ModPrefix + "." + rawid;
+            }
+
+            // Lowercase the whole thing because
+            // the core engine expects all IDs to be lowercase.
+            return rawid.ToLower();
+        }
+
+        // TODO: Make this also delve into individual subfields and canonicalize those IDs.
+        public LoadedDataFile CanonicalizeId(LoadedDataFile item)
+        {
+            foreach (JObject member in ((JArray)item.EntityContainer.Value))
+            {
+                JProperty id = member.Property("id");
+                if (id != null)
+                {
+                    id.Value = CanonicalizeId(id.Value.ToString());
+                }
+            }
+
+            return item;
         }
 
         public IDoorwaysMod GetInitializerMetadata(DoorwaysPlugin forPlugin)
@@ -145,6 +155,9 @@ namespace Doorways
         public string CanonicalizeId(string rawid)
         {
             var _span = Logger.Instance.Span();
+
+            if (rawid == null) { return null; }
+
             // If the entity id starts with a dot, we need to
             // remove the dot and allow the remaining ID through as-is.
             if (rawid.StartsWith("."))

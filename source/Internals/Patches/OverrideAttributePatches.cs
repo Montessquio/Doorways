@@ -38,7 +38,7 @@ namespace Doorways.Internals.Patches
                     foreach (PropertyInfo parentProperty in parentType.GetProperties())
                     {
                         // And if the child class declares it shadows a parent class' property...
-                        if (childProperty.IsDeclaredMember() && parentProperty.Name == childProperty.Name && parentProperty.PropertyType == childProperty.PropertyType)
+                        if (childProperty.IsDeclaredMember() && parentProperty.Name == childProperty.Name && parentProperty.PropertyType.IsAssignableFrom(childProperty.PropertyType))
                         {
                             // Perform the patch.
                             _span.Debug($"Patching {parentType.FullName}.{parentProperty.Name} redirect to {@class.FullName}.{childProperty.Name}");

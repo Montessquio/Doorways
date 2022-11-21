@@ -45,6 +45,9 @@
       <HintPath>G:\Steam Games\steamapps\common\Cultist Simulator\cultistsimulator_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Hjson, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\Hjson.3.0.0\lib\net40\Hjson.dll</HintPath>
+    </Reference>
     <Reference Include="Mono.Cecil, Version=0.11.4.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
       <HintPath>packages\Mono.Cecil.0.11.4\lib\net40\Mono.Cecil.dll</HintPath>
     </Reference>
@@ -395,6 +398,7 @@
     <Compile Include="doorways.cs" />
     <Compile Include="DoorwaysAttributes.cs" />
     <Compile Include="DoorwaysMod.cs" />
+    <Compile Include="Entities\Aspect.cs" />
     <Compile Include="Entities\Card.cs" />
     <Compile Include="Entities\Mixins\IForcedSuperclassMixin.cs" />
     <Compile Include="Entities\INamespacedIDEntity.cs" />
