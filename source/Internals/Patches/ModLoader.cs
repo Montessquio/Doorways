@@ -20,6 +20,7 @@ using System.Text;
 using SecretHistories.Fucine.DataImport;
 using SecretHistories.Constants.Modding;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using Doorways.Internals.Loaders;
 
 namespace Doorways.Internals.Patches
 {
@@ -46,6 +47,7 @@ namespace Doorways.Internals.Patches
         {
             foreach(DoorwaysMod mod in Mods.Values)
             {
+                if(mod.ModPrefix == prefix) { return (mod.ModName, "Core Mod (No Plugin)"); }
                 foreach (DoorwaysPlugin plugin in mod.plugins.Values)
                 {
                     if (plugin.Prefix == prefix)
@@ -242,6 +244,11 @@ namespace Doorways.Internals.Patches
             var _span = Logger.Instance.Span();
             try
             {
+                foreach (IEntityWithId entity in mod.registry.Values)
+                {
+                    TryRegisterInstancedEntity(entity, mod.ModName, ref compendium, ref log);
+                }
+
                 foreach (DoorwaysPlugin plugin in mod.plugins.Values)
                 {
                     foreach (IEntityWithId entity in plugin.registry.Values)

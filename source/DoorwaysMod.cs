@@ -1,5 +1,6 @@
 ﻿using Doorways.Entities;
 using Doorways.Entities.Mixins;
+using Doorways.Internals;
 using Doorways.Internals.Patches;
 using HarmonyLib;
 using Microsoft.Win32;
@@ -25,6 +26,23 @@ namespace Doorways
 
         // Holds the raw data from every plugin, as well as all their static defs.
         internal Dictionary<string, DoorwaysPlugin> plugins { get; private set; } = new Dictionary<string, DoorwaysPlugin>();
+        
+        // This registry holds top-level defs, i.e. raw JSON defs not produced by any plugin.
+        // It only holds top-level defs for doorways types! Vanilla types are loaded into Core
+        // when the plugin is first loaded, because they require no special runtime processing.
+        internal Dictionary<string, IEntityWithId> registry = new Dictionary<string, IEntityWithId>();
+
+        public void RegisterEntity(IEntityWithId entity)
+        {
+            var _span = Logger.Instance.Span();
+
+            if (registry.ContainsKey(entity.Id))
+            {
+                throw new ArgumentException($"The mod {ModName} has already registered an entity with ID {entity.Id}");
+            }
+            registry.Add(entity.Id, entity);
+            _span.Debug($"Loaded Entity '{entity.Id}'/'{entity.Id}' for mod '{ModName}' as '{entity.GetUnderlyingElement().Name}'");
+        }
 
         public void RegisterPlugin(Assembly pluginAssembly)
         {
