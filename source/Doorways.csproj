@@ -408,6 +408,10 @@
     <Compile Include="Events\DoorwaysEventHandler.cs" />
     <Compile Include="Events\SceneEvent.cs" />
     <Compile Include="IDoorwaysMod.cs" />
+    <Compile Include="Internals\IDCanonicalizer.cs" />
+    <Compile Include="Internals\Loaders\DoorwaysContentLoader.cs" />
+    <Compile Include="Internals\Loaders\HJSONLoader.cs" />
+    <Compile Include="Internals\Loaders\JSONLoader.cs" />
     <Compile Include="Internals\Patches\DynamicObjects.cs" />
     <Compile Include="Internals\Patches\ModLoader.cs" />
     <Compile Include="Internals\Patches\OverrideAttributePatches.cs" />

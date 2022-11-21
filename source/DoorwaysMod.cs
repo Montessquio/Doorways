@@ -85,43 +85,15 @@ namespace Doorways
             ModLoader.Mods.Add(ModName, this);
         }
 
-        public string CanonicalizeId(string rawid)
+        public string CanonicalizeId(string item)
         {
-            var _span = Logger.Instance.Span();
-
-            if (rawid == null) { return null; }
-
-            // If the entity id starts with a dot, we need to
-            // remove the dot and allow the remaining ID through as-is.
-            if (rawid.StartsWith("."))
-            {
-                rawid = rawid.Substring(1);
-            }
-            // If it's not designated as a literal ID,
-            // we need to prepend its mod's prefix.
-            else
-            {
-                rawid = ModPrefix + "." + rawid;
-            }
-
-            // Lowercase the whole thing because
-            // the core engine expects all IDs to be lowercase.
-            return rawid.ToLower();
+            return IDCanonicalizer.CanonicalizeId(ModPrefix, item);
         }
 
         // TODO: Make this also delve into individual subfields and canonicalize those IDs.
         public LoadedDataFile CanonicalizeId(LoadedDataFile item)
         {
-            foreach (JObject member in ((JArray)item.EntityContainer.Value))
-            {
-                JProperty id = member.Property("id");
-                if (id != null)
-                {
-                    id.Value = CanonicalizeId(id.Value.ToString());
-                }
-            }
-
-            return item;
+            return IDCanonicalizer.CanonicalizeId(ModPrefix, item);
         }
 
         public IDoorwaysMod GetInitializerMetadata(DoorwaysPlugin forPlugin)

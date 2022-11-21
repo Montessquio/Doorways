@@ -410,124 +410,23 @@ namespace Doorways.Internals.Patches
             }
         }
 
-        private static List<string> GetContentFilesRecursive(string path, string extension)
-        {
-            List<string> list = new List<string>();
-            if (Directory.Exists(path))
-            {
-                list.AddRange(Directory.GetFiles(path).ToList().FindAll((string f) => f.EndsWith(extension)));
-                string[] directories = Directory.GetDirectories(path);
-                foreach (string path2 in directories)
-                {
-                    list.AddRange(GetContentFilesRecursive(path2, extension));
-                }
-            }
-
-            return list;
-        }
-
         private static void LoadAlternateDataFormats(DoorwaysMod mod, DataFileLoader __instance, ref List<LoadedDataFile> ____loadedContentFiles)
         {
             var _span = Logger.Instance.Span();
             _span.Debug($"Loading alternate textual content formats for {mod.ModName}");
 
+            // Loaders pre-canonicalize all members for us.
+
             // Try to load JSON files
-            foreach (LoadedDataFile item in LoadJSONContent(__instance))
+            foreach (LoadedDataFile item in new JSONLoader(mod, __instance.ContentFolder).LoadContent())
             {
-                ____loadedContentFiles.Add(mod.CanonicalizeId(item));
+                ____loadedContentFiles.Add(item);
             }
 
             // Try to load HJSON files
-            foreach (LoadedDataFile item in LoadHJSONContent(__instance))
+            foreach (LoadedDataFile item in new HJSONLoader(mod, __instance.ContentFolder).LoadContent())
             {
-                ____loadedContentFiles.Add(mod.CanonicalizeId(item));
-            }
-        }
-
-        private static IEnumerable<LoadedDataFile> LoadJSONContent(DataFileLoader __instance)
-        {
-            var _span = Logger.Instance.Span();
-
-            var contentFilePaths = GetContentFilesRecursive(__instance.ContentFolder, ".json");
-            if (contentFilePaths.Any())
-            {
-                contentFilePaths.Sort();
-            }
-
-            foreach (string contentFilePath in contentFilePaths)
-            {
-                if (new FileInfo(contentFilePath).Length < 8)
-                {
-                    continue;
-                }
-
-                LoadedDataFile item = null;
-                try
-                {
-                    using (StreamReader reader = File.OpenText(contentFilePath))
-                    {
-                        using (JsonTextReader reader2 = new JsonTextReader(reader))
-                        {
-                            JProperty jProperty = ((JObject)JToken.ReadFrom(reader2)).Properties().First();
-                            item = new LoadedDataFile(contentFilePath, jProperty, jProperty.Name);
-                            _span.Debug($"Loaded '{contentFilePath}' as '{item.EntityTag}' with {((JArray)item.EntityContainer.Value).Count} members");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _span.Error("Problem parsing JSON file at " + contentFilePath + ": " + ex.Message);
-                }
-
-                if (item == null)
-                {
-                    continue;
-                }
-                yield return item;
-            }
-        }
-        
-        private static IEnumerable<LoadedDataFile> LoadHJSONContent(DataFileLoader __instance)
-        {
-            var _span = Logger.Instance.Span();
-
-            var contentFilePaths = GetContentFilesRecursive(__instance.ContentFolder, ".hjson");
-            if (contentFilePaths.Any())
-            {
-                contentFilePaths.Sort();
-            }
-
-            foreach (string contentFilePath in contentFilePaths)
-            {
-                if (new FileInfo(contentFilePath).Length < 8)
-                {
-                    continue;
-                }
-
-                LoadedDataFile item = null;
-                try
-                {
-                    // Load HJson from the file, and then convert it to JSON with ToString();
-                    using (StreamReader reader = new StreamReader(new MemoryStream(Encoding.UTF8.GetBytes(HjsonValue.Load(contentFilePath).ToString()))))
-                    {
-                        using (JsonTextReader reader2 = new JsonTextReader(reader))
-                        {
-                            JProperty jProperty = ((JObject)JToken.ReadFrom(reader2)).Properties().First();
-                            item = new LoadedDataFile(contentFilePath, jProperty, jProperty.Name);
-                            _span.Debug($"Loaded '{contentFilePath}' as '{item.EntityTag}' with {((JArray)item.EntityContainer.Value).Count} members");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _span.Error("Problem parsing HJSON file at " + contentFilePath + ": " + ex.Message);
-                }
-
-                if(item == null)
-                {
-                    continue;
-                }
-                yield return item;
+                ____loadedContentFiles.Add(item);
             }
         }
 
