@@ -20,6 +20,8 @@ namespace sh.monty.doorways.Patches.SecretHistories
     /// </summary>
     internal class LogPatcher
     {
+        private static int MAX_LOGS { get; } = 256;
+
         /// <summary>
         /// Any time the Core engine would request the console
         /// log level, replace it with Doorways' setting.
@@ -29,22 +31,41 @@ namespace sh.monty.doorways.Patches.SecretHistories
         [HarmonyPatch(typeof(SecretHistory), nameof(SecretHistory.Sensitivity))]
         private static bool ConsoleSensitivity(ref VerbosityLevel __result)
         {
-            //NoonUtility.Log();
             __result = Logger.ClampedLogLevel();
             return false;
         }
 
         /// <summary>
-        /// Any time the Core Engine would create a new GameObject
-        /// for each log message, simply append the log text to an existing gameobject instead.
+        /// Each log message is its own gameobject.
+        /// This patch limits the number of log messages
+        /// that are shown in the debug window (but not the log file)
+        /// so the game doesn't get immensely laggy with the window
+        /// open as time goes on.
+        /// <para/>
+        /// Technically, the best solution to this would be to
+        /// append the *text* into a single GameObject,
+        /// but that'd require a lot of logic to preserve
+        /// existing behavior semantics. So we're just capping
+        /// the max gameobjects in the container for simplicity
+        /// and calling it a day.
         /// </summary>
-        /// <returns></returns>
-        [HarmonyPrefix]
+        [HarmonyPostfix]
         [HarmonyPatch(typeof(SecretHistory), nameof(SecretHistory.AddMessage))]
-        private static bool AddMessageToDebugLog()
+        private static void AddMessageToDebugLog(ref List<SecretHistoryLogMessageEntry> ___entries, ILogMessage message)
         {
-            // TODO
-            return true;
+            if (___entries.Count > MAX_LOGS)
+            {
+                foreach (SecretHistoryLogMessageEntry entry in ___entries)
+                {
+                    if (entry.TryMatchMessage(message))
+                    {
+                        return;
+                    }
+                }
+
+                UnityEngine.Object.Destroy(___entries[0].gameObject);
+                ___entries.RemoveAt(0);
+            }
         }
     }
 }
