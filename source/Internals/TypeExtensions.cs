@@ -8,8 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 /// <summary>
-/// Technically not a Patch,
-/// but provides some extension
+/// Provides some extension
 /// methods to extract entity
 /// type metadata for the ModLoader.
 /// </summary>

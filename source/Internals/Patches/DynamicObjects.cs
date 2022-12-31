@@ -20,6 +20,7 @@ namespace Doorways.Internals.Patches
     /// allow recipes to perform custom actions before
     /// they resolve.
     /// </summary>
+    /*
     [HarmonyPatch]
     internal static class DynamicObjects
     {
@@ -56,4 +57,5 @@ namespace Doorways.Internals.Patches
             }
         }
     }
+    */
 }

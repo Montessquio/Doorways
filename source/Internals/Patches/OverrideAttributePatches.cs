@@ -52,7 +52,7 @@ namespace Doorways.Internals.Patches
                                         nameof(OverrideAttributePatches.PatchGetter),
                                         generics: new Type[] { parentType, @class, childProperty.PropertyType }
                                     );
-                                    _mod.GlobalPatcher.Patch(parentProperty.GetGetMethod(), postfix: new HarmonyMethod(interceptor));
+                                    DoorwaysFramework.GlobalPatcher.Patch(parentProperty.GetGetMethod(), postfix: new HarmonyMethod(interceptor));
                                 }
                                 catch (HarmonyException e)
                                 {
@@ -76,7 +76,7 @@ namespace Doorways.Internals.Patches
                                         nameof(OverrideAttributePatches.PatchSetter),
                                         generics: new Type[] { parentType, @class, childProperty.PropertyType }
                                     );
-                                    _mod.GlobalPatcher.Patch(parentProperty.GetSetMethod(), prefix: new HarmonyMethod(interceptor));
+                                    DoorwaysFramework.GlobalPatcher.Patch(parentProperty.GetSetMethod(), prefix: new HarmonyMethod(interceptor));
                                 }
                                 catch (HarmonyException e)
                                 {

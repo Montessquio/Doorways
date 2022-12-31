@@ -17,6 +17,7 @@ namespace sh.monty.doorways.Patches.SecretHistories
     /// when a card would decay, and replace
     /// what it decays to.
     /// </summary>
+    [Obsolete]
     [HarmonyPatch]
     internal class DecayInterceptPatches
     {

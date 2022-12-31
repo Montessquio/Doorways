@@ -28,7 +28,7 @@ namespace Doorways.Internals
     internal class UhOScene : MonoBehaviour
     {
         private static StackTrace lastStackTrace = null;
-        public static void OnUhOSceneInit(StackTrace st)
+        public static void OnUhOSceneInit(ref StackTrace st)
         {
             var _span = Logger.Instance.Span();
             _span.Info("Detected core engine crash.");

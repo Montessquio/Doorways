@@ -1,6 +1,6 @@
 ﻿using Doorways.Entities;
-using Doorways.Entities.Mixins;
 using Doorways.Internals;
+using Doorways.Internals.ModLoader;
 using Doorways.Internals.Patches;
 using HarmonyLib;
 using Microsoft.Win32;
@@ -10,27 +10,76 @@ using SecretHistories.Entities;
 using SecretHistories.Fucine;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
+using TMPro;
 using UIWidgets.Extensions;
 using UniverseLib;
 
 namespace Doorways
 {
+    public interface IDoorwaysMod
+    {
+        string ModName { get; }
+        string ModPrefix { get; }
+    }
+
+    // Mod metadata information passed to Doorways mod plugins.
+    public interface IDoorwaysPlugin
+    {
+        /// <summary>
+        /// The ID of the Mod this plugin is registered with.
+        /// </summary>
+        string ModName { get; }
+
+        /// <summary>
+        /// The mod prefix as set in the mod's synopsis.
+        /// </summary>
+        string ModPrefix { get; }
+
+        /// <summary>
+        /// Register a new game content entity with this plugin.
+        /// This method does not pre-canonicalize the fields of the
+        /// provided entity.
+        /// </summary>
+        void RegisterEntity(IEntityWithId entity);
+
+        /// <summary>
+        /// Register a new game content entity with this plugin.
+        /// This method automatically canonicalizes the fields of 
+        /// the provided entity.
+        /// </summary>
+        void RegisterEntity(INamespacedIDEntity entity);
+
+        /// <summary>
+        /// Informs Doorways that the caller would like to be the one in charge
+        /// of converting static (JSON, etc) data into IEntityWithIDs. This is on
+        /// a first come, first serve basis, so future callers will get an exception
+        /// if they try to register a handler for the same entityTag.
+        /// </summary>
+        void RegisterEntityType(string entityTag, CustomEntity.EntityConstructor constructor);
+
+        /// <summary>
+        /// Manually canonicalize an ID with this plugin's metadata.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        string CanonicalizeId(string id);
+    }
+
     /// <summary>
-    /// 
+    /// Contains information used by Doorways to load mods.
     /// </summary>
-    public class DoorwaysMod
+    public class DoorwaysMod : IDoorwaysMod
     {
         public string ModName { get; private set; }
         public string ModPrefix { get; private set; }
 
         // Holds the raw data from every plugin, as well as all their static defs.
         internal Dictionary<string, DoorwaysPlugin> plugins { get; private set; } = new Dictionary<string, DoorwaysPlugin>();
-        
+
         // This registry holds top-level defs, i.e. raw JSON defs not produced by any plugin.
-        // It only holds top-level defs for doorways types! Vanilla types are loaded into Core
-        // when the plugin is first loaded, because they require no special runtime processing.
-        internal Dictionary<string, IEntityWithId> registry = new Dictionary<string, IEntityWithId>();
+        internal CanonicalMap<string, IEntityWithId> registry;
 
         public void RegisterEntity(IEntityWithId entity)
         {
@@ -46,16 +95,7 @@ namespace Doorways
 
         public void RegisterPlugin(Assembly pluginAssembly)
         {
-            var _span = Logger.Instance.Span();
-
-            DoorwaysPlugin p = new DoorwaysPlugin(pluginAssembly);
-            if (plugins.ContainsKey(p.Prefix))
-            {
-                throw new ArgumentException($"The mod {ModName} has already registered a plugin with ID {p.Prefix}");
-            }
-
-            plugins.Add(p.Prefix, p);
-            _span.Debug($"Loaded Plugin '{p.Name}' for mod '{ModName}' as '{p.Prefix}'");
+            RegisterPlugin(new DoorwaysPlugin(pluginAssembly));
         }
 
         public void RegisterPlugin(DoorwaysPlugin p)
@@ -68,21 +108,10 @@ namespace Doorways
             }
 
             plugins.Add(p.Prefix, p);
+            p.ModName = this.ModName;
+            p.ModPrefix = this.ModPrefix;
+
             _span.Debug($"Loaded Plugin '{p.Name}' for mod '{ModName}' as '{p.Prefix}'");
-        }
-
-        public DoorwaysMod(string modName, string prefix = null)
-        {
-            ModName = modName;
-            ModPrefix = prefix ?? ModName.ToLower().Replace(" ", "");
-
-            if (ModLoader.Mods.ContainsKey(ModName))
-            {
-                DoorwaysMod other = ModLoader.Mods[ModName];
-                throw new ArgumentException($"Could not register {ModName}: the mod name has already been claimed.");
-            }
-
-            ModLoader.Mods.Add(ModName, this);
         }
 
         public string CanonicalizeId(string item)
@@ -90,46 +119,95 @@ namespace Doorways
             return IDCanonicalizer.CanonicalizeId(ModPrefix, item);
         }
 
-        // TODO: Make this also delve into individual subfields and canonicalize those IDs.
         public LoadedDataFile CanonicalizeId(LoadedDataFile item)
         {
             return IDCanonicalizer.CanonicalizeId(ModPrefix, item);
         }
 
-        public IDoorwaysMod GetInitializerMetadata(DoorwaysPlugin forPlugin)
+        public DoorwaysMod(string modName, string prefix = null)
         {
-            // TODO
-            return null;
+            ModName = modName;
+            ModPrefix = prefix ?? ModName.ToLower().Replace(" ", "");
+
+            registry = new CanonicalMap<string, IEntityWithId>(CanonicalizeId, ModPrefix);
+        }
+
+        /// <summary>
+        /// Attempt to load a Doorways Mod from a JObject containing the synopsis.
+        /// Does not load plugins or content.
+        /// </summary>
+        public static bool TryFrom(JObject synopsis, out DoorwaysMod mod)
+        {
+            if (synopsis != null && synopsis.ContainsKey("doorways", JTokenType.Object))
+            {
+                string mod_prefix = null;
+                JObject manifest = (JObject)synopsis["doorways"];
+                if (manifest.ContainsKey("prefix", JTokenType.String))
+                {
+                    mod_prefix = ((JObject)synopsis["doorways"])["prefix"].ToString();
+                }
+
+                mod = new DoorwaysMod(mod_prefix);
+                return true;
+            }
+
+            mod = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Attempt to load a Doorways Mod object from the synopsis at its
+        /// mod root directory. Does not load plugins or content.
+        /// </summary>
+        public static bool TryFrom(string mod_root, out DoorwaysMod mod)
+        {
+            var _span = Logger.Instance.Span();
+
+            // fast-exit if this is the core directory
+            if (Directory.GetParent(mod_root).Name == "StreamingAssets")
+            {
+                mod = null;
+                return false;
+            }
+
+            string syn_path = Path.Combine(mod_root, "synopsis.json");
+            JObject synopsis;
+            try
+            {
+                synopsis = JObject.Parse(File.ReadAllText(syn_path));
+            }
+            catch (Exception e) 
+            { 
+                throw new Exception($"Unable to load synopsis.json for path {syn_path}", e); 
+            }
+
+            return TryFrom(synopsis, out mod);
         }
     }
 
-    public class DoorwaysPlugin
+    public class DoorwaysPlugin : IDoorwaysPlugin
     {
         internal Assembly PluginAssembly { get; set; }
-
-        public string Name
-        {
-            get
-            {
-                return PluginAssembly.GetCustomAttribute<DoorwaysAttribute>().Name;
-            }
-        }
-
-        public string Prefix
-        {
-            get
-            {
-                return PluginAssembly.GetCustomAttribute<DoorwaysAttribute>().Prefix;
-            }
-        }
+        public string Name { get; internal set; } = "NONE";
+        public string Prefix { get; internal set; } = null;
+        public string ModName { get; internal set; } = "NONE";
+        public string ModPrefix { get; internal set; } = null;
 
         // This registry holds pre-canonicalized defs produced by this plugin.
-        internal Dictionary<string, IEntityWithId> registry = new Dictionary<string, IEntityWithId>();
+        internal CanonicalMap<string, IEntityWithId> registry;
 
         public DoorwaysPlugin(Assembly plugin)
         {
             PluginAssembly = plugin;
-            LoadPlugin();
+
+            var attr = PluginAssembly.GetCustomAttribute<DoorwaysAttribute>();
+            if(attr != null)
+            {
+                Name = attr.Name;
+                Prefix = attr.Prefix;
+            }
+
+            registry = new CanonicalMap<string, IEntityWithId>(CanonicalizeId, Prefix);
         }
 
         public string CanonicalizeId(string rawid)
@@ -157,12 +235,8 @@ namespace Doorways
         }
 
         /// <summary>
-        /// Registers entity instances with
-        /// the game's engine. This can only
-        /// be done when the game is loading,
-        /// and will throw exceptions if it
-        /// is modified after the game is
-        /// done loading.
+        /// Registers game content with this plugin's
+        /// internal registry.
         /// <para/>
         /// Note that while this method accepts any
         /// <see cref="IEntityWithId"/> for flexibility,
@@ -185,52 +259,20 @@ namespace Doorways
                 throw new ArgumentException($"The plugin {Name} has already registered an entity with ID {entity.Id}");
             }
             registry.Add(entity.Id, entity);
-            _span.Debug($"Loaded Entity '{entity.Id}'/'{entity.Id}' for mod '{Name}' as '{entity.GetUnderlyingElement().Name}'");
+            _span.Debug($"Loaded Entity '{Name}'/'{entity.Id}' as '{entity.GetUnderlyingElement().Name}'");
         }
 
-
-        private void LoadPlugin()
+        public void RegisterEntity(INamespacedIDEntity entity)
         {
             var _span = Logger.Instance.Span();
+            entity.CanonicalizeIds(CanonicalizeId, this.Prefix ?? this.ModPrefix);
+            _span.Info($"Canonicaliized '{Name}'/'{entity.Id}'");
+            RegisterEntity(entity);
+        }
 
-            var doorwaysModAttr = PluginAssembly.GetCustomAttribute<DoorwaysAttribute>();
-
-            string PluginName = doorwaysModAttr.Name ?? PluginAssembly.GetName().Name;
-            string PluginPrefix = doorwaysModAttr.Prefix ?? PluginName.ToLower();
-
-            // Instantiating this class automatically adds the instance
-            // to the doorways mod registry.
-
-            // Get all [DoorwaysObject]s in the assembly
-            foreach (Type t in PluginAssembly.GetTypes())
-            {
-                if (t.IsClass)
-                {
-                    // Determine if this is a valid entity we can register.
-                    _span.Debug($"Inspecting type '{t.Name}'");
-                    bool hasDoorwaysAttr = t.GetCustomAttribute<DoorwaysObjectAttribute>() != null;
-                    if (hasDoorwaysAttr)
-                    {
-                        bool isRegisterable = typeof(IEntityWithId).IsAssignableFrom(t);
-                        bool isFactory = typeof(IDoorwaysFactory).IsAssignableFrom(t);
-                        _span.Debug($"  {t.Name}: (Registerable: {(isRegisterable ? "true" : "false")}, Factory: {(isFactory ? "true" : "false")})");
-
-                        if (isRegisterable)
-                        {
-                            RegisterEntity(ModLoader.InstantiateStaticEntity(t));
-                        }
-                        else if (isFactory)
-                        {
-                            IDoorwaysFactory factory = Activator.CreateInstance(t) as IDoorwaysFactory;
-                            factory.GetAll().ForEach((entity) => RegisterEntity(entity));
-                        }
-                        else
-                        {
-                            _span.Error($"Marked entity '{t.FullName}' does not derive from IEntityWithId or DoorwaysFactory and/or is not marked with the [DoorwaysObject] attribute, so it cannot be registered as game data.");
-                        }
-                    }
-                }
-            }
+        public void RegisterEntityType(string entityTag, CustomEntity.EntityConstructor constructor)
+        {
+            CustomEntity.RegisterNewType(ModName, entityTag, constructor);
         }
     }
 }

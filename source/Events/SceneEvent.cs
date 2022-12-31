@@ -20,7 +20,8 @@ namespace Doorways.Events
         {
             if (MenuSceneInit != null)
             {
-                MenuSceneInit.Invoke(null);
+                var dummy = new object();
+                MenuSceneInit.Invoke(ref dummy);
             }
         }
 
@@ -31,7 +32,8 @@ namespace Doorways.Events
         {
             if (UhOSceneInit != null)
             {
-                UhOSceneInit.Invoke(new StackTrace(true));
+                var param = new StackTrace(true);
+                UhOSceneInit.Invoke(ref param);
             }
         }
     }

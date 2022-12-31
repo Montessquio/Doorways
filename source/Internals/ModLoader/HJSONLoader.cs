@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Hjson;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -7,11 +8,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Doorways.Internals.Loaders
+namespace Doorways.Internals.ModLoader
 {
-    internal class JSONLoader : DoorwaysContentLoader
+    internal class HJSONLoader : DoorwaysContentLoader
     {
-        public JSONLoader(DoorwaysMod mod, string contentFolder) : base(mod, contentFolder)
+        public HJSONLoader(DoorwaysMod mod, string contentFolder) : base(mod, contentFolder)
         {
         }
 
@@ -19,7 +20,7 @@ namespace Doorways.Internals.Loaders
         {
             var _span = Logger.Instance.Span();
 
-            var contentFilePaths = GetContentFilesRecursive(contentFolder, ".json");
+            var contentFilePaths = GetContentFilesRecursive(contentFolder, ".hjson");
             if (contentFilePaths.Any())
             {
                 contentFilePaths.Sort();
@@ -35,7 +36,8 @@ namespace Doorways.Internals.Loaders
                 LoadedDataFile item = null;
                 try
                 {
-                    using (StreamReader reader = File.OpenText(contentFilePath))
+                    // Load HJson from the file, and then convert it to JSON with ToString();
+                    using (StreamReader reader = new StreamReader(new MemoryStream(Encoding.UTF8.GetBytes(HjsonValue.Load(contentFilePath).ToString()))))
                     {
                         using (JsonTextReader reader2 = new JsonTextReader(reader))
                         {
@@ -47,7 +49,7 @@ namespace Doorways.Internals.Loaders
                 }
                 catch (Exception ex)
                 {
-                    _span.Error("Problem parsing JSON file at " + contentFilePath + ": " + ex.Message);
+                    _span.Error("Problem parsing HJSON file at " + contentFilePath + ": " + ex.Message);
                 }
 
                 if (item == null)

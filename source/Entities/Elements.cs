@@ -1,30 +1,62 @@
-﻿using Doorways.Entities.Mixins;
-using HarmonyLib;
-using SecretHistories.Core;
-using SecretHistories.Entities;
-using SecretHistories.Fucine;
+﻿using SecretHistories.Core;
 using SecretHistories.Fucine.DataImport;
+using SecretHistories.Fucine;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using UniverseLib;
-using static UnityEngine.EventSystems.EventTrigger;
+using Newtonsoft.Json.Linq;
 
 namespace Doorways.Entities
 {
-    public abstract class Card : Element, INamespacedIDEntity, IInheritOverride<Element>
+    public class Aspect : Element, INamespacedIDEntity
+    {
+        public override bool IsAspect
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        public Aspect(string baseid, string title, string description) : base(new EntityData(), new ContentImportLog())
+        {
+            this.Id = baseid;
+            this.Label = title;
+            this.Description = description;
+        }
+
+        public Aspect(LoadedDataFile source, IDoorwaysMod forMod)
+        {
+
+        }
+    }
+
+    public class Card : Element, INamespacedIDEntity
+    {
+        public override bool IsAspect
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        public Card(LoadedDataFile source, IDoorwaysMod forMod)
+        {
+
+        }
+    }
+
+    public class Element : SecretHistories.Entities.Element, INamespacedIDEntity, IInheritOverride<Element>
     {
         // This exact field is inherited from AbstractEntity<>
         //public virtual string Id { get; protected set; } = null;
 
-        public abstract new string Label { get; set; }
-        public abstract new string Description { get; set; }
+        public virtual new string Label { get; set; }
+        public virtual new string Description { get; set; }
 
         private string _icon;
         public virtual new string Icon
@@ -61,7 +93,7 @@ namespace Doorways.Entities
         public virtual new List<Slot> Slots { get; set; } = new List<Slot>();
         public virtual new List<RecipeLink> Induces { get; set; } = new List<RecipeLink>();
         public virtual new Dictionary<string, List<XTrigger>> XTriggers { get; set; } = new Dictionary<string, List<XTrigger>>();
-        public new AspectsDictionary AspectsIncludingSelf
+        public virtual new AspectsDictionary AspectsIncludingSelf
         {
             get
             {
@@ -79,14 +111,19 @@ namespace Doorways.Entities
                 return aspectsDictionary;
             }
         }
-        public new bool Decays => Lifetime > 0f;
-        public new bool IsAspect { get; } = false;
+        public virtual new bool Decays => Lifetime > 0f;
+        public virtual new bool IsAspect { get; } = false;
 
-        public Card(EntityData importDataForEntity, ContentImportLog log) : base(importDataForEntity, log) { }
+        public Element(EntityData importDataForEntity, ContentImportLog log) : base(importDataForEntity, log) { }
 
-        public Card(ContentImportLog log) : base(new EntityData(), log) { }
+        public Element(ContentImportLog log) : base(new EntityData(), log) { }
 
-        public Card() : base(new EntityData(), new ContentImportLog()) { }
+        public Element() : base(new EntityData(), new ContentImportLog()) { }
+
+        public Element(LoadedDataFile source, IDoorwaysMod forMod)
+        {
+            throw new NotImplementedException();
+        }
 
         public virtual void CanonicalizeIds(FnCanonicalize Canonicalize, string prefix)
         {
@@ -109,12 +146,12 @@ namespace Doorways.Entities
                 }
                 Aspects = a;
             }
-            foreach(var s in Slots)
+            foreach (var s in Slots)
             {
                 s.CanonicalizeIds(Canonicalize, prefix);
             }
 
-            foreach(var l in Induces)
+            foreach (var l in Induces)
             {
                 l.CanonicalizeIds(Canonicalize, prefix);
             }

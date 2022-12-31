@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SecretHistories.Fucine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,7 +18,7 @@ namespace Doorways.Entities
     /// mod's namespace and canonicalizing
     /// absolute IDs.
     /// </summary>
-    public interface INamespacedIDEntity
+    public interface INamespacedIDEntity : IEntityWithId
     {
         /// <summary>
         /// Doorways will try to call this method
@@ -28,6 +29,14 @@ namespace Doorways.Entities
         /// replace any IDs and references to IDs
         /// with the result of `fnCanonicalize` for
         /// that ID.
+        /// <para>
+        /// <b>This method may be called more than once!</b>
+        /// It is up to the implementor to ensure
+        /// that IDs remain properly canonicalized even across
+        /// multiple calls. For the majority of cases,
+        /// a simple fnOnce flag which fast-exits
+        /// if the method has already been run once
+        /// will suffice.
         /// <para/>
         /// All Doorways base entity
         /// classes have their own implementations

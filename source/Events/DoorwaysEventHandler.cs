@@ -7,5 +7,5 @@ using System.Threading.Tasks;
 
 namespace Doorways.Events
 {
-    public delegate void DoorwaysEventHandler<T>(T data);
+    public delegate void DoorwaysEventHandler<T>(ref T data);
 }

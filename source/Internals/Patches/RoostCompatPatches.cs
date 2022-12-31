@@ -9,7 +9,7 @@ using System.Reflection.Emit;
 
 namespace sh.monty.doorways.Patches
 {
-    internal class RoostCompat
+    internal class RoostCompatPatches
     {
         private static bool DidPatchAlready = false;
         public static void Patch(Harmony patcher)
